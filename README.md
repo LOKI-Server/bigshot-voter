@@ -129,6 +129,42 @@ cargo build --profile release-size
 
 Release profile uses thin LTO, stripped symbols, `panic = abort`, and `codegen-units = 1`. Linking uses `rust-lld` (see `.cargo/config.toml`).
 
+### Windows installer
+
+The app stores runtime data in `data/` next to the executable by default. A
+classic install under `Program Files` is not writable for a normal user, so the
+Windows package **defaults to a per-user, writable location**:
+
+```text
+%LOCALAPPDATA%\Programs\bigshot-voter\
+```
+
+That way `{exe_dir}\data` works without elevation or `--set-data-dir`. Config
+still lives in `%APPDATA%\bigshot-voter\bigshot.json`. Uninstall removes
+program files only; it does **not** delete `data\` or the AppData config.
+
+Build the package (from the repo root):
+
+```powershell
+.\packaging\windows\build-installer.ps1
+# optional: -Profile release-size
+# optional: -ZipOnly          # skip Setup.exe, only portable zip
+# optional: -SkipBuild        # reuse an existing release binary
+```
+
+Outputs land in `target\windows-installer\`:
+
+| Artifact | Notes |
+|----------|--------|
+| `BigShotVoting-<ver>-setup.exe` | Inno Setup installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)) |
+| `BigShotVoting-<ver>-portable-win64.zip` | Always produced — unzip anywhere writable |
+
+If Inno Setup is missing, the script still builds the portable zip and prints
+install instructions. Install Inno with `winget install JRSoftware.InnoSetup`,
+then re-run with `-SkipBuild`.
+
+Sources: `packaging/windows/` (`bigshot-voter.iss`, `launch.cmd`, `build-installer.ps1`).
+
 ## Data layout
 
 On first start the server writes `bigshot.json` in the user config directory:
