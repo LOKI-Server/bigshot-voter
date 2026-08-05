@@ -81,7 +81,7 @@ Open <http://127.0.0.1:17843>, register the first account (you become admin), th
 | `--data-dir` / `BIGSHOT_DATA_DIR` | from user-dir `bigshot.json`, else `{exe_dir}/data` | Database, secret, uploads (process override only) |
 | `--set-data-dir` | — | Write `data_dir` into `bigshot.json` and exit (does not start the server) |
 | `--clear-data-dir` | — | Clear the saved override (back to `{exe_dir}/data`) and exit |
-| `--max-upload` / `BIGSHOT_MAX_UPLOAD` | 33554432 (32 MiB) | Max upload size in bytes |
+| `--max-upload` / `BIGSHOT_MAX_UPLOAD` | 5242880 (5 MiB) | Max upload size in bytes |
 
 ```bash
 cargo run -- --data-dir ./dev-data --bind 0.0.0.0:17843

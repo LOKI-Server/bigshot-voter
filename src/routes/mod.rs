@@ -26,6 +26,10 @@ pub fn router() -> Router<AppState> {
         .route("/panels/{id}/entries", post(panels::upload_entry))
         .route("/panels/{id}/votes", post(panels::cast_vote))
         .route("/media/{entry_id}", get(panels::serve_media))
+        .route(
+            "/media/{entry_id}/master",
+            get(panels::serve_master).post(panels::upload_master),
+        )
         .route("/admin", get(admin::dashboard))
         .route(
             "/admin/panels/new",

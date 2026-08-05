@@ -203,6 +203,77 @@ pub fn accept_attr(media_type: MediaType) -> String {
     allowed_extensions(media_type).join(",")
 }
 
+/// Creative-tool / project source formats accepted as an optional master copy.
+/// Always served as download attachments (`application/octet-stream`).
+const MASTER_EXTENSIONS: &[&str] = &[
+    "paint", // various paint-app project files
+    "kra",   // Krita
+    "psd",   // Photoshop
+    "psb",
+    "xcf", // GIMP
+    "clip",
+    "csp", // Clip Studio
+    "sai",
+    "sai2",
+    "ora", // OpenRaster
+    "afphoto",
+    "afdesign", // Affinity
+    "pdn",      // Paint.NET
+    "tif",
+    "tiff",
+    "svg",
+    "ai",
+    "cdr",
+    "fig",
+    "sketch",
+    "procreate",
+    "blend", // Blender
+];
+
+/// Validate an optional master/source upload (not the display entry file).
+pub fn validate_master_upload(original_filename: &str) -> Result<ValidatedUpload, String> {
+    let ext = Path::new(original_filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .filter(|e| !e.is_empty())
+        .ok_or_else(|| "Master file must have an extension.".to_string())?;
+
+    if ext.contains('/') || ext.contains('\\') || ext.contains("..") {
+        return Err("Invalid master file extension.".into());
+    }
+
+    if !MASTER_EXTENSIONS.contains(&ext.as_str()) {
+        return Err(format!(
+            "Master extension .{ext} is not allowed. Allowed: {}.",
+            master_ext_list()
+        ));
+    }
+
+    Ok(ValidatedUpload {
+        extension: ext,
+        content_type: "application/octet-stream".into(),
+    })
+}
+
+/// Human-readable list of master extensions for upload hints.
+pub fn master_ext_list() -> String {
+    MASTER_EXTENSIONS
+        .iter()
+        .map(|e| format!(".{e}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Value for the optional master file input `accept` attribute.
+pub fn master_accept_attr() -> String {
+    MASTER_EXTENSIONS
+        .iter()
+        .map(|e| format!(".{e}"))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 /// Ensure a stored relative path stays under the uploads root.
 pub fn resolve_upload_path(uploads_root: &Path, relative: &str) -> Result<PathBuf, String> {
     if relative.is_empty()
@@ -253,5 +324,30 @@ mod tests {
     fn accepts_mp3_for_audio() {
         let v = validate_upload(MediaType::Audio, "track.mp3", Some("audio/mpeg")).unwrap();
         assert_eq!(v.extension, "mp3");
+    }
+
+    #[test]
+    fn accepts_kra_master() {
+        let v = validate_master_upload("layers.KRA").unwrap();
+        assert_eq!(v.extension, "kra");
+        assert_eq!(v.content_type, "application/octet-stream");
+    }
+
+    #[test]
+    fn accepts_paint_master() {
+        let v = validate_master_upload("work.paint").unwrap();
+        assert_eq!(v.extension, "paint");
+    }
+
+    #[test]
+    fn rejects_exe_master() {
+        assert!(validate_master_upload("evil.exe").is_err());
+    }
+
+    #[test]
+    fn rejects_archive_masters() {
+        assert!(validate_master_upload("layers.zip").is_err());
+        assert!(validate_master_upload("layers.7z").is_err());
+        assert!(validate_master_upload("layers.rar").is_err());
     }
 }

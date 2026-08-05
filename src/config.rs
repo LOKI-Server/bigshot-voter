@@ -20,7 +20,7 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 const SECRET_LEN: usize = 32;
-const DEFAULT_MAX_UPLOAD: u64 = 32 * 1024 * 1024;
+const DEFAULT_MAX_UPLOAD: u64 = 5 * 1024 * 1024;
 
 /// Config file name stored under the user config directory.
 pub const CONFIG_FILE: &str = "bigshot.json";

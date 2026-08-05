@@ -111,6 +111,8 @@ pub struct PanelDetailPage {
     pub can_vote: bool,
     pub total_votes: i64,
     pub max_upload_label: String,
+    /// `accept="…"` for the optional master file input.
+    pub master_accept: String,
     /// Shows the "Edit panel" affordance.
     pub is_admin: bool,
 }
@@ -184,6 +186,8 @@ pub struct EntryView {
     pub share_pct: u32,
     /// Top entry of a closed panel with at least one vote.
     pub is_winner: bool,
+    /// Entry includes an optional master/source file for download.
+    pub has_master: bool,
 }
 
 impl EntryView {
@@ -216,6 +220,7 @@ impl EntryView {
                 // to well over 100.)
                 share_pct: percent_of(e.vote_count, total),
                 is_winner: !panel_is_open && e.vote_count > 0 && e.vote_count == leader,
+                has_master: e.has_master(),
             })
             .collect()
     }
@@ -317,6 +322,8 @@ mod tests {
             original_filename: "f.png".into(),
             stored_path: "p/f.png".into(),
             content_type: "image/png".into(),
+            master_original_filename: None,
+            master_stored_path: None,
             created_at: "2024-01-01T00:00:00Z".into(),
             vote_count: votes,
         }

@@ -222,6 +222,8 @@ async fn one_entry_and_vote_change() {
         "a.png",
         &format!("{}/e1.png", panel.id),
         "image/png",
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -233,6 +235,8 @@ async fn one_entry_and_vote_change() {
         "b.png",
         &format!("{}/e2.png", panel.id),
         "image/png",
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -246,6 +250,8 @@ async fn one_entry_and_vote_change() {
         "c.png",
         &format!("{}/e3.png", panel.id),
         "image/png",
+        None,
+        None,
     )
     .await;
     assert!(dup.is_err());
@@ -282,6 +288,8 @@ async fn one_entry_and_vote_change() {
         "c.png",
         &format!("{}/e3.png", panel.id),
         "image/png",
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -363,6 +371,8 @@ async fn cannot_vote_for_own_entry_via_http() {
         "a.png",
         &format!("{}/e1.png", panel.id),
         "image/png",
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -374,6 +384,8 @@ async fn cannot_vote_for_own_entry_via_http() {
         "b.png",
         &format!("{}/e2.png", panel.id),
         "image/png",
+        None,
+        None,
     )
     .await
     .unwrap();

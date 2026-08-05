@@ -66,6 +66,13 @@
       <span class="hint" id="upload-file-name"></span>
       <span class="hint">Allowed: {{ panel.allowed_extensions }} · up to {{ max_upload_label }}</span>
     </label>
+    <label>
+      Master copy <span class="hint">optional</span>
+      <input type="file" name="master" accept="{{ master_accept }}"
+             data-file-input="#upload-master-name">
+      <span class="hint" id="upload-master-name"></span>
+      <span class="hint">Optional project/source file others can download (e.g. .kra, .paint, .psd) · up to {{ max_upload_label }}</span>
+    </label>
     <div class="form-actions">
       <button type="submit" class="btn">Upload entry</button>
     </div>
@@ -101,6 +108,8 @@
                 data-kind="{{ panel.media_type }}"
                 data-title="{{ e.title }}"
                 data-author="{{ e.username }}"
+                {% if e.has_master %}data-master="/media/{{ e.id }}/master"{% endif %}
+                {% if e.is_mine && !e.has_master %}data-master-upload="/media/{{ e.id }}/master"{% endif %}
                 aria-label="Enlarge “{{ e.title }}” by {{ e.username }}">
           {% if panel.is_image %}
             <img src="/media/{{ e.id }}" alt="{{ e.title }}" loading="lazy" decoding="async">
@@ -173,12 +182,17 @@
     <div class="lightbox-bar">
       <span class="lightbox-caption"></span>
       <span class="lightbox-actions">
-        <button type="button" class="bar-btn" data-lb-prev>Prev</button>
-        <button type="button" class="bar-btn" data-lb-next>Next</button>
-        <a class="bar-btn" data-lb-open href="/" target="_blank" rel="noopener">Original</a>
+        <a class="bar-btn" data-lb-open href="/" target="_blank" rel="noopener">Open in new tab</a>
+        <a class="bar-btn" data-lb-master href="/" hidden>Download master</a>
+        <button type="button" class="bar-btn" data-lb-master-upload hidden>Upload master</button>
         <button type="button" class="bar-btn" data-lb-close>Close</button>
       </span>
     </div>
   </div>
 </dialog>
+<form id="lightbox-master-form" method="post" enctype="multipart/form-data" hidden
+      data-busy="Uploading…">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="file" name="master" accept="{{ master_accept }}" data-lb-master-file>
+</form>
 {% endblock %}

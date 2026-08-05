@@ -12,13 +12,19 @@
   if (dialog && typeof dialog.showModal === "function") {
     const stage = dialog.querySelector(".lightbox-stage");
     const caption = dialog.querySelector(".lightbox-caption");
-    const prevBtn = dialog.querySelector("[data-lb-prev]");
-    const nextBtn = dialog.querySelector("[data-lb-next]");
     const openBtn = dialog.querySelector("[data-lb-open]");
+    const masterBtn = dialog.querySelector("[data-lb-master]");
+    const masterUploadBtn = dialog.querySelector("[data-lb-master-upload]");
+    const masterForm = document.getElementById("lightbox-master-form");
+    const masterFile = masterForm
+      ? masterForm.querySelector("[data-lb-master-file]")
+      : null;
 
     /** @type {HTMLElement[]} */
     let triggers = [];
     let index = -1;
+    /** @type {string} */
+    let masterUploadAction = "";
 
     const refresh = () => {
       triggers = Array.from(document.querySelectorAll("[data-lightbox]"));
@@ -43,6 +49,8 @@
       const kind = el.dataset.kind || "file";
       const title = el.dataset.title || "Entry";
       const author = el.dataset.author || "";
+      const master = el.dataset.master || "";
+      const canUploadMaster = el.dataset.masterUpload || "";
 
       clearStage();
 
@@ -76,14 +84,26 @@
       if (author) caption.append(document.createTextNode(` by ${author}`));
 
       if (openBtn) openBtn.href = src;
-      const multiple = triggers.length > 1;
-      prevBtn.disabled = !multiple;
-      nextBtn.disabled = !multiple;
-    };
 
-    const step = (delta) => {
-      if (triggers.length < 2) return;
-      render((index + delta + triggers.length) % triggers.length);
+      masterUploadAction = "";
+      if (masterBtn) {
+        if (master) {
+          masterBtn.href = master;
+          masterBtn.hidden = false;
+        } else {
+          masterBtn.removeAttribute("href");
+          masterBtn.hidden = true;
+        }
+      }
+      if (masterUploadBtn) {
+        // Same slot as download: only the owner of an entry without a master sees this.
+        if (!master && canUploadMaster) {
+          masterUploadAction = canUploadMaster;
+          masterUploadBtn.hidden = false;
+        } else {
+          masterUploadBtn.hidden = true;
+        }
+      }
     };
 
     document.addEventListener("click", (event) => {
@@ -95,19 +115,22 @@
       if (!dialog.open) dialog.showModal();
     });
 
-    prevBtn.addEventListener("click", () => step(-1));
-    nextBtn.addEventListener("click", () => step(1));
     dialog.querySelector("[data-lb-close]").addEventListener("click", () => dialog.close());
 
-    dialog.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        step(-1);
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        step(1);
-      }
-    });
+    if (masterUploadBtn && masterFile && masterForm) {
+      masterUploadBtn.addEventListener("click", () => {
+        if (!masterUploadAction) return;
+        masterFile.value = "";
+        masterFile.click();
+      });
+      masterFile.addEventListener("change", () => {
+        if (!masterFile.files || !masterFile.files[0] || !masterUploadAction) return;
+        masterForm.action = masterUploadAction;
+        masterUploadBtn.disabled = true;
+        masterUploadBtn.textContent = masterForm.dataset.busy || "Uploading…";
+        masterForm.submit();
+      });
+    }
 
     // Click outside the frame (i.e. on the backdrop) closes.
     dialog.addEventListener("click", (event) => {

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, header};
 use axum::routing::get;
 use sqlx::SqlitePool;
@@ -19,11 +20,20 @@ pub struct AppState {
 }
 
 pub fn build_router(state: AppState) -> Router {
+    // Axum defaults to 2 MiB; raise to match the configured upload cap plus
+    // multipart overhead (entry form can send display file + master together).
+    let max_upload = state.config.max_upload_bytes as usize;
+    let body_limit = max_upload
+        .saturating_mul(2)
+        .saturating_add(1024 * 1024)
+        .max(max_upload);
+
     Router::new()
         .merge(routes::router())
         // CSS and JS are compiled into the binary — nothing to ship alongside it.
         .route("/static/{file}", get(assets::serve))
         .route("/favicon.ico", get(assets::no_favicon))
+        .layer(DefaultBodyLimit::max(body_limit))
         .layer(TraceLayer::new_for_http())
         .layer(SetResponseHeaderLayer::if_not_present(
             header::X_CONTENT_TYPE_OPTIONS,

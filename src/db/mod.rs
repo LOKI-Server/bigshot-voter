@@ -72,6 +72,8 @@ async fn migrate(pool: &SqlitePool) -> Result<()> {
             original_filename TEXT NOT NULL,
             stored_path TEXT NOT NULL,
             content_type TEXT NOT NULL,
+            master_original_filename TEXT,
+            master_stored_path TEXT,
             created_at TEXT NOT NULL,
             UNIQUE (panel_id, user_id)
         );
@@ -100,6 +102,15 @@ async fn migrate(pool: &SqlitePool) -> Result<()> {
     add_column_if_missing(pool, "users", "email", "email TEXT").await?;
     add_column_if_missing(pool, "users", "email_key", "email_key TEXT").await?;
     add_column_if_missing(pool, "panels", "link", "link TEXT NOT NULL DEFAULT ''").await?;
+    add_column_if_missing(
+        pool,
+        "entries",
+        "master_original_filename",
+        "master_original_filename TEXT",
+    )
+    .await?;
+    add_column_if_missing(pool, "entries", "master_stored_path", "master_stored_path TEXT")
+        .await?;
 
     // Partial index: unique across the accounts that set an email, while any
     // number of accounts may leave it NULL.
@@ -474,6 +485,8 @@ fn map_entry(r: sqlx::sqlite::SqliteRow) -> Entry {
         original_filename: r.get("original_filename"),
         stored_path: r.get("stored_path"),
         content_type: r.get("content_type"),
+        master_original_filename: r.get("master_original_filename"),
+        master_stored_path: r.get("master_stored_path"),
         created_at: r.get("created_at"),
         vote_count: r.get("vote_count"),
     }
@@ -487,8 +500,8 @@ pub async fn list_entries_for_panel(
     let rows = sqlx::query(
         r#"
         SELECT e.id, e.panel_id, e.user_id, u.username, e.title, e.original_filename,
-               e.stored_path, e.content_type, e.created_at,
-               COUNT(v.id) AS vote_count
+               e.stored_path, e.content_type, e.master_original_filename, e.master_stored_path,
+               e.created_at, COUNT(v.id) AS vote_count
         FROM entries e
         JOIN users u ON u.id = e.user_id
         LEFT JOIN votes v ON v.entry_id = e.id
@@ -524,6 +537,73 @@ pub async fn find_entry_media(
     }))
 }
 
+/// Optional master/source file for download. Returns `None` when the entry is
+/// missing *or* has no master attached.
+pub async fn find_entry_master(
+    pool: &SqlitePool,
+    entry_id: &str,
+) -> Result<Option<(String, String)>, sqlx::Error> {
+    let row = sqlx::query(
+        "SELECT master_stored_path, master_original_filename FROM entries WHERE id = ?",
+    )
+    .bind(entry_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.and_then(|r| {
+        let path: Option<String> = r.get("master_stored_path");
+        let name: Option<String> = r.get("master_original_filename");
+        match (path, name) {
+            (Some(path), Some(name)) if !path.is_empty() && !name.is_empty() => Some((path, name)),
+            _ => None,
+        }
+    }))
+}
+
+/// Ownership + panel lookup for attaching a master after the fact.
+/// Returns `(panel_id, user_id, has_master)`.
+pub async fn find_entry_master_owner(
+    pool: &SqlitePool,
+    entry_id: &str,
+) -> Result<Option<(String, String, bool)>, sqlx::Error> {
+    let row = sqlx::query(
+        "SELECT panel_id, user_id, master_stored_path FROM entries WHERE id = ?",
+    )
+    .bind(entry_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|r| {
+        let path: Option<String> = r.get("master_stored_path");
+        let has_master = path.as_ref().is_some_and(|p| !p.is_empty());
+        (r.get("panel_id"), r.get("user_id"), has_master)
+    }))
+}
+
+/// Attach a master file to an entry that does not already have one.
+/// Returns `true` if a row was updated (owner + no existing master).
+pub async fn attach_entry_master(
+    pool: &SqlitePool,
+    entry_id: &str,
+    user_id: &str,
+    master_original_filename: &str,
+    master_stored_path: &str,
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query(
+        r#"
+        UPDATE entries
+        SET master_original_filename = ?, master_stored_path = ?
+        WHERE id = ? AND user_id = ?
+          AND (master_stored_path IS NULL OR master_stored_path = '')
+        "#,
+    )
+    .bind(master_original_filename)
+    .bind(master_stored_path)
+    .bind(entry_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected() > 0)
+}
+
 pub async fn user_entry_for_panel(
     pool: &SqlitePool,
     panel_id: &str,
@@ -545,13 +625,18 @@ pub async fn create_entry(
     original_filename: &str,
     stored_path: &str,
     content_type: &str,
+    master_original_filename: Option<&str>,
+    master_stored_path: Option<&str>,
 ) -> Result<String, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
     let created_at = now_rfc3339();
     sqlx::query(
         r#"
-        INSERT INTO entries (id, panel_id, user_id, title, original_filename, stored_path, content_type, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO entries (
+            id, panel_id, user_id, title, original_filename, stored_path, content_type,
+            master_original_filename, master_stored_path, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
     )
     .bind(&id)
@@ -561,6 +646,8 @@ pub async fn create_entry(
     .bind(original_filename)
     .bind(stored_path)
     .bind(content_type)
+    .bind(master_original_filename)
+    .bind(master_stored_path)
     .bind(&created_at)
     .execute(pool)
     .await?;

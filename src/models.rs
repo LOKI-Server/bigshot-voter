@@ -215,9 +215,22 @@ pub struct Entry {
     pub original_filename: String,
     pub stored_path: String,
     pub content_type: String,
+    /// Optional master/source file (e.g. `.kra`, `.paint`) original name.
+    pub master_original_filename: Option<String>,
+    /// Relative path under uploads for the master file, when present.
+    pub master_stored_path: Option<String>,
     /// RFC3339 timestamp
     pub created_at: String,
     pub vote_count: i64,
+}
+
+impl Entry {
+    #[inline]
+    pub fn has_master(&self) -> bool {
+        self.master_stored_path
+            .as_ref()
+            .is_some_and(|p| !p.is_empty())
+    }
 }
 
 #[derive(Debug, Clone)]
