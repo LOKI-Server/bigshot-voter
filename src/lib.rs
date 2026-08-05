@@ -11,6 +11,7 @@ pub mod media;
 pub mod models;
 pub mod routes;
 pub mod templates;
+pub mod tray;
 
 pub use app::{AppState, build_router};
 pub use config::{Cli, Config};

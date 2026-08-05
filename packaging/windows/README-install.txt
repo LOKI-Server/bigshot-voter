@@ -17,6 +17,14 @@ Start the server
   - Start Menu → Big-Shot Voting
   - Or run:  bigshot-voter.exe
 
+The server starts in the system tray (notification area). There is no
+console window by default.
+
+  Right-click the tray icon → Show Console  (server log window)
+                           → Exit
+  Minimize the console to hide it again; close the console to quit.
+  Left-click the tray icon also shows the console.
+
 Then open http://127.0.0.1:17843 and register the first account (admin).
 
 Change the data directory
@@ -24,7 +32,8 @@ Change the data directory
   bigshot-voter.exe --set-data-dir "D:\Servers\Big-Shot"
   bigshot-voter.exe --clear-data-dir
 
-Other flags: --bind, --data-dir (process-only), --max-upload.
+Other flags: --bind, --data-dir (process-only), --max-upload,
+  --foreground (keep console open), --no-tray.
 See the project README for details.
 
 Uninstall

@@ -1,6 +1,6 @@
 [package]
 name = "bigshot-voter"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "Big-Shot Voting — simple self-hosted voting panels"
 license = "MIT"
@@ -79,6 +79,18 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 mime = { version = "0.3", default-features = false }
 time = { version = "0.3", default-features = false, features = ["std", "formatting"] }
 serde_json = { version = "1.0.151", features = ["std"] }
+
+# System tray (Windows-first). default-features off so Linux/macOS builds
+# do not pull gtk / libappindicator unless a platform needs them later.
+[target.'cfg(windows)'.dependencies]
+tray-icon = { version = "0.24", default-features = false }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

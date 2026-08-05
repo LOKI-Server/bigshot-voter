@@ -53,6 +53,16 @@ pub struct Cli {
     /// Maximum upload size in bytes.
     #[arg(long, env = "BIGSHOT_MAX_UPLOAD", default_value_t = DEFAULT_MAX_UPLOAD)]
     pub max_upload_bytes: u64,
+
+    /// Keep the console window visible and skip minimize-to-tray behavior.
+    /// Useful when developing with `cargo run` or when launched from a terminal.
+    /// On Windows the tray icon still appears unless `--no-tray` is set.
+    #[arg(long, env = "BIGSHOT_FOREGROUND")]
+    pub foreground: bool,
+
+    /// Do not create a system tray icon (headless / service-style runs).
+    #[arg(long, env = "BIGSHOT_NO_TRAY")]
+    pub no_tray: bool,
 }
 
 /// On-disk settings in the user config directory. Generated on first start.

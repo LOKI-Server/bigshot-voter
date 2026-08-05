@@ -7,6 +7,7 @@ Admins open **voting panels** (images, audio, video, or other files). Approved m
 ## Features
 
 - **Ships as one executable.** CSS, JavaScript, and every HTML template are compiled into the binary — there is no `static/` folder to copy and nothing to go missing.
+- **Windows system tray** (release builds): starts in the notification area, with Show Console / Exit; minimize returns to the tray, close exits
 - **Markdown panel descriptions**, with an optional **related link**, editable after creation
 - **First account is the sole overseeing admin** (auto-approved)
 - Later users register with username + password and wait for **admin approval**
@@ -82,6 +83,24 @@ Open <http://127.0.0.1:17843>, register the first account (you become admin), th
 | `--set-data-dir` | — | Write `data_dir` into `bigshot.json` and exit (does not start the server) |
 | `--clear-data-dir` | — | Clear the saved override (back to `{exe_dir}/data`) and exit |
 | `--max-upload` / `BIGSHOT_MAX_UPLOAD` | 5242880 (5 MiB) | Max upload size in bytes |
+| `--foreground` / `BIGSHOT_FOREGROUND` | off | Keep the console visible (recommended for `cargo run`) |
+| `--no-tray` / `BIGSHOT_NO_TRAY` | off | Do not create a system tray icon |
+
+### Windows system tray
+
+On Windows the server is a GUI-subsystem app: a normal start (not `--set-data-dir` /
+`--clear-data-dir`) places a **tray icon** and does not open a console by default.
+
+- **Starts in the tray** on double-click / Start Menu (no console flash).
+- When launched from an existing terminal (`cargo run`, PowerShell, etc.), that
+  console is attached for logs and CLI output and is **not** hidden.
+- **Right-click** the icon → **Show Console** or **Exit**.
+- **Left-click** (or double-click) the icon also shows the console.
+- **Minimize** the console window returns it to the tray (hidden from the taskbar).
+- **Close** the console window shuts the server down.
+
+Use `--foreground` to force a console window open (`cargo run -- --foreground --data-dir ./dev-data`).
+Use `--no-tray` for headless or service-style runs.
 
 ```bash
 cargo run -- --data-dir ./dev-data --bind 0.0.0.0:17843
