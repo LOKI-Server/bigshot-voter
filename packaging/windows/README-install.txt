@@ -14,9 +14,8 @@ rights. You do not need --set-data-dir for a normal install.
 
 Start the server
 ----------------
-  - Start Menu → Big-Shot Voting  (starts server + opens the browser)
+  - Start Menu → Big-Shot Voting
   - Or run:  bigshot-voter.exe
-  - Or:      launch.cmd
 
 Then open http://127.0.0.1:17843 and register the first account (admin).
 

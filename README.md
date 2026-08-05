@@ -143,27 +143,19 @@ That way `{exe_dir}\data` works without elevation or `--set-data-dir`. Config
 still lives in `%APPDATA%\bigshot-voter\bigshot.json`. Uninstall removes
 program files only; it does **not** delete `data\` or the AppData config.
 
-Build the package (from the repo root):
+Build a release binary, then compile the Inno Setup script (needs
+[Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 
 ```powershell
-.\packaging\windows\build-installer.ps1
-# optional: -Profile release-size
-# optional: -ZipOnly          # skip Setup.exe, only portable zip
-# optional: -SkipBuild        # reuse an existing release binary
+cargo build --release
+iscc packaging\windows\bigshot-voter.iss
 ```
 
-Outputs land in `target\windows-installer\`:
+The installer lands in `target\windows-installer\` as
+`BigShotVoting-<ver>-setup.exe`. Shortcuts and the post-install “Start now”
+option run `bigshot-voter.exe` directly.
 
-| Artifact | Notes |
-|----------|--------|
-| `BigShotVoting-<ver>-setup.exe` | Inno Setup installer (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)) |
-| `BigShotVoting-<ver>-portable-win64.zip` | Always produced — unzip anywhere writable |
-
-If Inno Setup is missing, the script still builds the portable zip and prints
-install instructions. Install Inno with `winget install JRSoftware.InnoSetup`,
-then re-run with `-SkipBuild`.
-
-Sources: `packaging/windows/` (`bigshot-voter.iss`, `launch.cmd`, `build-installer.ps1`).
+Sources: `packaging/windows/` (`bigshot-voter.iss`, `README-install.txt`).
 
 ## Data layout
 

@@ -7,7 +7,6 @@
 ;
 ; Build (from repo root, after a release binary exists):
 ;   iscc packaging\windows\bigshot-voter.iss
-; Or use packaging\windows\build-installer.ps1 which builds + packages.
 
 #ifndef AppVersion
   #define AppVersion "0.1.0"
@@ -63,17 +62,15 @@ Name: "startmenu"; Description: "Create a Start Menu shortcut"; GroupDescription
 
 [Files]
 Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "{#MyAppExeName}"; Flags: ignoreversion
-Source: "launch.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README-install.txt"; DestDir: "{app}"; DestName: "README.txt"; Flags: ignoreversion isreadme
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\launch.cmd"; WorkingDir: "{app}"; Comment: "Start the voting server and open the site"; Tasks: startmenu
-Name: "{group}\{#MyAppName} (console only)"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Comment: "Run the server without opening a browser"; Tasks: startmenu
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Comment: "Start the voting server"; Tasks: startmenu
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; Tasks: startmenu
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\launch.cmd"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\launch.cmd"; Description: "Start {#MyAppName} now"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\{#MyAppExeName}"; Description: "Start {#MyAppName} now"; Flags: nowait postinstall skipifsilent unchecked
 
 [UninstallDelete]
 ; Only remove empty leftovers under the install dir — never wipe data/.
