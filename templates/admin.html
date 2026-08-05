@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Big-Shot Voting{% endblock %}
+{% block body_class %}theme-admin{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <span class="eyebrow">Admin</span>
+  <h1>Dashboard</h1>
+  <p class="lede">Approve accounts and run voting panels. Only the first registered account is admin.</p>
+  <div class="stack">
+    <a class="btn" href="/admin/panels/new">Start a new vote panel</a>
+    <a class="btn btn-ghost" href="/panels">View panels</a>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Pending accounts</h2>
+    {% if !pending.is_empty() %}<span class="chip"><strong>{{ pending.len() }}</strong>&nbsp;waiting</span>{% endif %}
+  </div>
+
+  {% if pending.is_empty() %}
+    <div class="empty"><p>No pending registrations.</p></div>
+  {% else %}
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>Username</th><th>Registered</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+        {% for p in pending %}
+          <tr>
+            <td><strong>{{ p.username }}</strong></td>
+            <td class="muted">{{ p.created_at }}</td>
+            <td>
+              <div class="actions">
+                <form method="post" action="/admin/users/{{ p.id }}/approve" class="inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn btn-small">Approve</button>
+                </form>
+                <form method="post" action="/admin/users/{{ p.id }}/reject" class="inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn btn-small btn-danger">Reject</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Panels</h2>
+    <a href="/admin/panels/new">New panel →</a>
+  </div>
+
+  {% if panels.is_empty() %}
+    <div class="empty">
+      <p><strong>No panels yet.</strong></p>
+      <p><a href="/admin/panels/new">Create the first one →</a></p>
+    </div>
+  {% else %}
+    <ul class="card-list">
+    {% for p in panels %}
+      <li class="card panel-card">
+        <div class="card-top">
+          <h3><a href="/panels/{{ p.id }}">{{ p.title }}</a></h3>
+          <span class="badge {% if p.is_open %}badge-open{% else %}badge-closed{% endif %}">{{ p.status }}</span>
+        </div>
+        <div class="panel-meta">
+          <span>{{ p.media_label }}</span>
+          <span class="dot">{{ p.entry_count }} {% if p.entry_count == 1 %}entry{% else %}entries{% endif %}</span>
+          <span class="dot">{{ p.vote_count }} {% if p.vote_count == 1 %}vote{% else %}votes{% endif %}</span>
+        </div>
+        <div class="actions">
+          {% if p.is_open %}
+            <form method="post" action="/admin/panels/{{ p.id }}/close" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn btn-small btn-quiet">Close voting</button>
+            </form>
+          {% else %}
+            <form method="post" action="/admin/panels/{{ p.id }}/open" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn btn-small btn-quiet">Re-open</button>
+            </form>
+          {% endif %}
+          <a class="btn btn-small btn-ghost" href="/admin/panels/{{ p.id }}/edit">Edit</a>
+          <a class="btn btn-small btn-ghost" href="/panels/{{ p.id }}">Open</a>
+        </div>
+      </li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}

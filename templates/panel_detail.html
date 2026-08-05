@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}{{ panel.title }} - Big-Shot Voting{% endblock %}
+
+{% block content %}
+<p class="crumb"><a href="/panels">← All panels</a></p>
+
+<section class="panel-hero">
+  <div class="card-top">
+    <div>
+      <span class="eyebrow">{{ panel.media_label }}</span>
+      <h1>{{ panel.title }}</h1>
+    </div>
+    <span class="badge {% if panel.is_open %}badge-open{% else %}badge-closed{% endif %}">{{ panel.status }}</span>
+  </div>
+
+  {% if panel.has_description %}
+    {# Pre-rendered Markdown; crate::markdown drops raw HTML and unsafe URLs. #}
+    <div class="prose">{{ panel.description_html|safe }}</div>
+  {% endif %}
+
+  {% if panel.has_link || is_admin %}
+    <div class="panel-actions">
+      {% if panel.has_link %}
+        <a class="btn btn-small btn-quiet" href="{{ panel.link }}" target="_blank" rel="noopener noreferrer">
+          {{ panel.link_label }}
+        </a>
+      {% endif %}
+      {% if is_admin %}
+        <a class="btn btn-small btn-ghost" href="/admin/panels/{{ panel.id }}/edit">Edit panel</a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="panel-stats">
+    <span class="chip"><strong>{{ entries.len() }}</strong>&nbsp;{% if entries.len() == 1 %}entry{% else %}entries{% endif %}</span>
+    <span class="chip"><strong>{{ total_votes }}</strong>&nbsp;{% if total_votes == 1 %}vote{% else %}votes{% endif %}</span>
+    {% if panel.is_open %}
+      <span class="chip">You may change your vote until voting closes</span>
+      {% if my_entry_id.is_some() %}
+        <span class="chip">Your entry is in</span>
+      {% else %}
+        <span class="chip">One upload per person</span>
+      {% endif %}
+    {% else %}
+      <span class="chip">Voting is closed, results are final</span>
+    {% endif %}
+  </div>
+</section>
+
+{% if can_upload %}
+<section class="card">
+  <h2>Submit your entry</h2>
+  <p class="muted">One upload per person. You cannot vote for your own entry.</p>
+  <form method="post" action="/panels/{{ panel.id }}/entries" enctype="multipart/form-data"
+        class="form" data-busy="Uploading…">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>
+      Title <span class="hint">optional</span>
+      <input type="text" name="title" maxlength="120" placeholder="Short label for your entry">
+    </label>
+    <label>
+      File
+      <input type="file" name="file" required accept="{{ panel.accept }}"
+             data-file-input="#upload-file-name">
+      <span class="hint" id="upload-file-name"></span>
+      <span class="hint">Allowed: {{ panel.allowed_extensions }} · up to {{ max_upload_label }}</span>
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn">Upload entry</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<section>
+  <div class="section-head">
+    <h2>Entries <span class="muted">({{ entries.len() }})</span></h2>
+    {% if !entries.is_empty() %}
+      <span class="muted">Ranked by votes</span>
+    {% endif %}
+  </div>
+
+  {% if entries.is_empty() %}
+    <div class="empty">
+      <p><strong>No entries yet.</strong></p>
+      {% if can_upload %}
+        <p>Be the first. Upload yours above.</p>
+      {% else if panel.is_open %}
+        <p>Entries will appear here as people upload them.</p>
+      {% else %}
+        <p>This panel closed without any entries.</p>
+      {% endif %}
+    </div>
+  {% else %}
+    <ul class="tile-grid">
+    {% for e in entries %}
+      <li class="tile{% if e.is_my_vote %} tile-voted{% endif %}{% if e.is_winner %} tile-winner{% endif %}">
+        <button type="button" class="tile-media" data-lightbox
+                data-src="/media/{{ e.id }}"
+                data-kind="{{ panel.media_type }}"
+                data-title="{{ e.title }}"
+                data-author="{{ e.username }}"
+                aria-label="Enlarge “{{ e.title }}” by {{ e.username }}">
+          {% if panel.is_image %}
+            <img src="/media/{{ e.id }}" alt="{{ e.title }}" loading="lazy" decoding="async">
+          {% else if panel.is_video %}
+            <video src="/media/{{ e.id }}" preload="metadata" muted playsinline></video>
+          {% else %}
+            <span class="tile-placeholder" aria-hidden="true">{{ panel.media_label }}</span>
+          {% endif %}
+          {% if !panel.is_open %}<span class="tile-rank tile-rank-{{ e.rank }}">#{{ e.rank }}</span>{% endif %}
+          <span class="tile-zoom" aria-hidden="true">Enlarge</span>
+        </button>
+
+        {# Every row below is always rendered - optional content reserves its
+           space so tiles stay aligned and nothing jumps when a badge appears. #}
+        <div class="tile-body">
+          <div class="tile-heading">
+            <div class="tile-title" title="{{ e.title }}">{{ e.title }}</div>
+            <div class="tile-author">by {{ e.username }}</div>
+          </div>
+
+          <div class="tile-badges">
+            {% if e.is_mine %}<span class="badge badge-mine">Yours</span>{% endif %}
+            {% if e.is_my_vote %}<span class="badge badge-vote">Your vote</span>{% endif %}
+            {% if e.is_winner %}<span class="badge badge-win">Winner</span>{% endif %}
+          </div>
+
+          {% if panel.is_audio %}
+            <audio controls preload="none" src="/media/{{ e.id }}"></audio>
+          {% endif %}
+
+          <div class="tile-stats">
+            <div class="tile-score">
+              <span><span class="tile-votes">{{ e.vote_count }}</span> {% if e.vote_count == 1 %}vote{% else %}votes{% endif %}</span>
+              <span class="tile-share{% if total_votes == 0 %} is-empty{% endif %}">{{ e.share_pct }}%</span>
+            </div>
+            <div class="meter" role="presentation"><span style="width: {{ e.share_pct }}%"></span></div>
+          </div>
+
+          <div class="tile-foot">
+            {% if can_vote && e.is_mine %}
+              <p class="tile-note">You cannot vote for your own entry.</p>
+            {% else if can_vote && e.is_my_vote %}
+              <button type="button" class="btn btn-small btn-vote btn-voted" disabled>Your vote</button>
+            {% else if can_vote %}
+              <form method="post" action="/panels/{{ panel.id }}/votes">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="entry_id" value="{{ e.id }}">
+                <button type="submit" class="btn btn-small btn-vote">
+                  {% if my_vote_entry_id.is_some() %}Switch vote here{% else %}Vote{% endif %}
+                </button>
+              </form>
+            {% else if !panel.is_open %}
+              <p class="tile-note">{% if e.is_my_vote %}You voted for this{% else %}Voting closed{% endif %}</p>
+            {% else %}
+              <p class="tile-note">Voting unavailable</p>
+            {% endif %}
+          </div>
+        </div>
+      </li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block page_end %}
+<dialog class="lightbox" id="lightbox" aria-label="Entry preview">
+  <div class="lightbox-frame">
+    <div class="lightbox-stage"></div>
+    <div class="lightbox-bar">
+      <span class="lightbox-caption"></span>
+      <span class="lightbox-actions">
+        <button type="button" class="bar-btn" data-lb-prev>Prev</button>
+        <button type="button" class="bar-btn" data-lb-next>Next</button>
+        <a class="bar-btn" data-lb-open href="/" target="_blank" rel="noopener">Original</a>
+        <button type="button" class="bar-btn" data-lb-close>Close</button>
+      </span>
+    </div>
+  </div>
+</dialog>
+{% endblock %}

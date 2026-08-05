@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Big-Shot Voting{% endblock %}
+
+{% block content %}
+<section class="card narrow">
+  <h1>Register</h1>
+  {% if is_first_user %}
+    <p class="callout">You will be the <strong>overseeing admin</strong>. This account is approved automatically.</p>
+  {% else %}
+    <p class="muted">Pick a username and password. An admin approves your account before you can upload or vote.</p>
+  {% endif %}
+
+  {% if let Some(err) = error %}
+    <div class="flash flash-error" role="alert">{{ err }}</div>
+  {% endif %}
+
+  <form method="post" action="/register" class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>
+      Username
+      <input type="text" name="username" required minlength="3" maxlength="32"
+             autocomplete="username" pattern="[A-Za-z0-9_]+" autofocus>
+      <span class="hint">3–32 characters: letters, numbers, and underscores.</span>
+    </label>
+    <label>
+      Password
+      <input type="password" name="password" required minlength="8" maxlength="128" autocomplete="new-password">
+      <span class="hint">At least 8 characters.</span>
+    </label>
+    <label>
+      Confirm password
+      <input type="password" name="password_confirm" required minlength="8" maxlength="128" autocomplete="new-password">
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="btn">Create account</button>
+    </div>
+  </form>
+  <p class="muted" style="margin-top: 1rem">Already have an account? <a href="/login">Log in</a></p>
+</section>
+{% endblock %}

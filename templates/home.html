@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Big-Shot Voting{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <span class="eyebrow">Self-hosted voting panels</span>
+  <h1>Settle it with a vote.</h1>
+  <p class="lede">
+    Open a panel for images, music, videos, or files. Approved members upload one
+    entry each and cast one vote. They can change their pick right up until voting closes.
+  </p>
+  {% if needs_bootstrap %}
+    <p class="callout">
+      <strong>Nobody has registered yet.</strong>
+      The first account becomes the overseeing admin.
+    </p>
+    <div class="stack"><a class="btn" href="/register">Create the admin account</a></div>
+  {% else if user.is_none() %}
+    <div class="stack">
+      <a class="btn" href="/register">Request an account</a>
+      <a class="btn btn-ghost" href="/login">Log in</a>
+    </div>
+  {% else if let Some(u) = user %}
+    {% if u.is_pending %}
+      <p class="callout">Your account is waiting for admin approval.</p>
+    {% else if u.is_approved %}
+      <div class="stack">
+        <a class="btn" href="/panels">Browse panels</a>
+        {% if u.is_admin %}
+          <a class="btn btn-ghost" href="/admin">Admin dashboard</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endif %}
+</section>
+
+{% if !panels.is_empty() %}
+<section>
+  <div class="section-head">
+    <h2>Panels</h2>
+    {% if let Some(u) = user %}
+      {% if u.is_approved %}<a href="/panels">See all →</a>{% endif %}
+    {% endif %}
+  </div>
+
+  <ul class="card-list">
+  {% for p in panels %}
+    <li class="card panel-card">
+      <div class="card-top">
+        {% if let Some(u) = user %}
+          {% if u.is_approved %}
+            <h3><a class="stretch" href="/panels/{{ p.id }}">{{ p.title }}</a></h3>
+          {% else %}
+            <h3>{{ p.title }}</h3>
+          {% endif %}
+        {% else %}
+          <h3>{{ p.title }}</h3>
+        {% endif %}
+        <span class="badge {% if p.is_open %}badge-open{% else %}badge-closed{% endif %}">{{ p.status }}</span>
+      </div>
+
+      {% if !p.excerpt.is_empty() %}
+        <p class="panel-desc">{{ p.excerpt }}</p>
+      {% endif %}
+
+      <div class="panel-meta">
+        <span>{{ p.media_label }}</span>
+        {% if let Some(u) = user %}
+          {% if u.is_approved %}
+            <span class="dot">{{ p.entry_count }} {% if p.entry_count == 1 %}entry{% else %}entries{% endif %}</span>
+            <span class="dot">{{ p.vote_count }} {% if p.vote_count == 1 %}vote{% else %}votes{% endif %}</span>
+          {% else %}
+            <span class="dot">Approval required to view</span>
+          {% endif %}
+        {% else %}
+          <span class="dot">Log in to view entries and vote</span>
+        {% endif %}
+      </div>
+    </li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

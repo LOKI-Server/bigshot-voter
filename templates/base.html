@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>{% block title %}Big-Shot Voting{% endblock %}</title>
+  <link rel="stylesheet" href="{{ crate::assets::css_href() }}">
+  <script src="{{ crate::assets::js_href() }}" defer></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="/">Big-Shot Voting</a>
+      <nav class="nav" aria-label="Main">
+        {% if let Some(u) = user %}
+          {% if u.is_approved %}
+            <a class="nav-link" href="/panels">Panels</a>
+          {% endif %}
+          {% if u.is_admin %}
+            <a class="nav-link" href="/admin">Admin</a>
+          {% endif %}
+          <a class="nav-user" href="/settings" title="Account settings">{{ u.username }}</a>
+          {# Log out lives at the bottom of /settings. Rejected accounts can't
+             open that page, so keep a way out for them here. #}
+          {% if !u.is_approved && !u.is_pending %}
+            <form class="inline" method="post" action="/logout">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="linkish">Log out</button>
+            </form>
+          {% endif %}
+        {% else %}
+          <a class="nav-link" href="/login">Log in</a>
+          <a class="btn btn-small" href="/register">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap" id="main">
+    {% if let Some(msg) = flash %}
+      <div class="flash" role="status">{{ msg }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>One entry and one vote per panel. Change your pick until voting closes.</p>
+    </div>
+  </footer>
+
+  {% block page_end %}{% endblock %}
+</body>
+</html>

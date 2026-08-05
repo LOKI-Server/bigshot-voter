@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Panels - Big-Shot Voting{% endblock %}
+
+{% block content %}
+<section>
+  <div class="section-head">
+    <h1>Voting panels</h1>
+    {% if let Some(u) = user %}
+      {% if u.is_admin %}<a class="btn btn-small" href="/admin/panels/new">New panel</a>{% endif %}
+    {% endif %}
+  </div>
+
+  {% if panels.is_empty() %}
+    <div class="empty">
+      <p><strong>No panels yet.</strong></p>
+      {% if let Some(u) = user %}
+        {% if u.is_admin %}
+          <p><a href="/admin/panels/new">Start the first one →</a></p>
+        {% else %}
+          <p>An admin needs to open one before voting can begin.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% else %}
+    <ul class="card-list">
+    {% for p in panels %}
+      <li class="card panel-card">
+        <div class="card-top">
+          <h3><a class="stretch" href="/panels/{{ p.id }}">{{ p.title }}</a></h3>
+          <span class="badge {% if p.is_open %}badge-open{% else %}badge-closed{% endif %}">{{ p.status }}</span>
+        </div>
+        {% if !p.excerpt.is_empty() %}
+          <p class="panel-desc">{{ p.excerpt }}</p>
+        {% endif %}
+        <div class="panel-meta">
+          <span>{{ p.media_label }}</span>
+          <span class="dot">{{ p.entry_count }} {% if p.entry_count == 1 %}entry{% else %}entries{% endif %}</span>
+          <span class="dot">{{ p.vote_count }} {% if p.vote_count == 1 %}vote{% else %}votes{% endif %}</span>
+        </div>
+      </li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Edit panel{% else %}New panel{% endif %} - Big-Shot Voting{% endblock %}
+{% block body_class %}theme-admin{% endblock %}
+
+{% block content %}
+<p class="crumb">
+  {% if let Some(id) = panel_id %}
+    <a href="/panels/{{ id }}">← Back to panel</a>
+  {% else %}
+    <a href="/admin">← Back to admin</a>
+  {% endif %}
+</p>
+
+<section class="card panel-form">
+  {% if is_edit %}
+    <h1>Edit panel</h1>
+    <p class="muted">Update the title, description, or related link. Entries and votes are untouched.</p>
+  {% else %}
+    <h1>Start a voting panel</h1>
+    <p class="muted">Everyone uploads one entry and votes for a favorite that isn't their own.</p>
+  {% endif %}
+
+  {% if let Some(err) = error %}
+    <div class="flash flash-error" role="alert">{{ err }}</div>
+  {% endif %}
+
+  <form method="post"
+        action="{% if let Some(id) = panel_id %}/admin/panels/{{ id }}/edit{% else %}/admin/panels/new{% endif %}"
+        class="form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label>
+      Title
+      <input type="text" name="title" required maxlength="120" value="{{ title }}"
+             placeholder="e.g. Best logo draft" autofocus>
+    </label>
+
+    <label>
+      Description <span class="hint">optional · Markdown</span>
+      <textarea name="description" rows="8" maxlength="4000"
+                placeholder="Rules, theme, deadline notes…&#10;&#10;**Bold**, _italic_, `code`, [links](https://example.com), - lists">{{ description }}</textarea>
+      <span class="hint">
+        Supports Markdown: <code>**bold**</code>, <code>_italic_</code>, <code>`code`</code>,
+        <code>[text](url)</code>, lists, quotes, and tables. Raw HTML is stripped.
+      </span>
+    </label>
+
+    <label>
+      Related link <span class="hint">optional</span>
+      <input type="url" name="link" maxlength="2000" value="{{ link }}"
+             placeholder="https://github.com/you/project">
+      <span class="hint">Shown as a button on the panel. Must start with http:// or https://</span>
+    </label>
+
+    {% if is_edit %}
+      <label>
+        Media type
+        <input type="text" value="{{ media_label }}" disabled>
+        <span class="hint">Fixed after creation. Existing entries were validated against it.</span>
+      </label>
+    {% else %}
+      <label>
+        Media type
+        <select name="media_type" required>
+          <option value="image">Image (.png, .jpg, .gif, .webp)</option>
+          <option value="audio">Audio / Music (.mp3, .ogg, .wav, .m4a, .flac)</option>
+          <option value="video">Video (.mp4, .webm, .mov, .mkv)</option>
+          <option value="other">Other file (.pdf, .zip, .txt)</option>
+        </select>
+        <span class="hint">This fixes what entrants may upload; it can't be changed later.</span>
+      </label>
+    {% endif %}
+
+    <div class="form-actions">
+      <button type="submit" class="btn">{% if is_edit %}Save changes{% else %}Create panel{% endif %}</button>
+      {% if let Some(id) = panel_id %}
+        <a class="btn btn-ghost" href="/panels/{{ id }}">Cancel</a>
+      {% else %}
+        <a class="btn btn-ghost" href="/admin">Cancel</a>
+      {% endif %}
+    </div>
+  </form>
+</section>
+{% endblock %}

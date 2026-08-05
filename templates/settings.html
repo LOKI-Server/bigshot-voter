@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Big-Shot Voting{% endblock %}
+{% block body_class %}theme-settings{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <span class="eyebrow">Account</span>
+  <h1>Settings</h1>
+  <p class="lede">
+    Change how you sign in. Adding an email is optional. Once set, you can log in
+    with either your username or your email address.
+  </p>
+</section>
+
+<div class="settings-grid">
+  <section class="card">
+    <h2>Sign-in details</h2>
+    <p class="muted">Your username is what other members see next to your entries.</p>
+
+    {% if let Some(err) = identity_error %}
+      <div class="flash flash-error" role="alert">{{ err }}</div>
+    {% endif %}
+
+    <form method="post" action="/settings/identity" class="form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        Username
+        <input type="text" name="username" value="{{ username }}" required
+               minlength="3" maxlength="32" autocomplete="username" pattern="[A-Za-z0-9_]+">
+        <span class="hint">3–32 characters: letters, numbers, and underscores.</span>
+      </label>
+      <label>
+        Email <span class="hint">optional</span>
+        <input type="email" name="email" value="{{ email }}" maxlength="254"
+               autocomplete="email" placeholder="you@example.com">
+        <span class="hint">Used only as an alternative way to sign in. Leave blank to remove it.</span>
+      </label>
+      <label>
+        Current password
+        <input type="password" name="current_password" required autocomplete="current-password">
+        <span class="hint">Required to change your sign-in details.</span>
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn">Save details</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Password</h2>
+    <p class="muted">Pick something at least 8 characters long.</p>
+
+    {% if let Some(err) = password_error %}
+      <div class="flash flash-error" role="alert">{{ err }}</div>
+    {% endif %}
+
+    <form method="post" action="/settings/password" class="form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        Current password
+        <input type="password" name="current_password" required autocomplete="current-password">
+      </label>
+      <label>
+        New password
+        <input type="password" name="new_password" required minlength="8" maxlength="128"
+               autocomplete="new-password">
+      </label>
+      <label>
+        Confirm new password
+        <input type="password" name="new_password_confirm" required minlength="8" maxlength="128"
+               autocomplete="new-password">
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="btn">Change password</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<section class="card signout">
+  <div>
+    <h2>Log out</h2>
+    <p class="muted">Ends this session on this device. Your entries and votes are kept.</p>
+  </div>
+  <form method="post" action="/logout">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="btn btn-ghost">Log out</button>
+  </form>
+</section>
+{% endblock %}
