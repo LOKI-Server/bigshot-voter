@@ -321,6 +321,7 @@ section + section {
   color: var(--text);
 }
 
+/* In-form validation errors stay in document flow. */
 .flash {
   display: flex;
   align-items: center;
@@ -331,7 +332,6 @@ section + section {
   padding: 0.7rem 1rem;
   border-radius: var(--radius);
   margin-bottom: 1.25rem;
-  animation: rise 0.28s var(--ease);
 }
 .flash-error {
   background: var(--danger-bg);
@@ -339,10 +339,45 @@ section + section {
   color: #ffc9c9;
 }
 
-@keyframes rise {
+/* Redirect flash messages — fixed overlay, never shifts page content. */
+.toast {
+  position: fixed;
+  z-index: 80;
+  left: 50%;
+  bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.8rem 1.15rem;
+  border-radius: var(--radius);
+  background: var(--ok-bg);
+  border: 1px solid rgba(69, 207, 143, 0.4);
+  color: #b8f2d4;
+  box-shadow: var(--shadow-lift);
+  text-align: center;
+  pointer-events: none;
+  animation: toast-in 0.28s var(--ease);
+}
+.toast.is-leaving {
+  animation: toast-out 0.25s var(--ease) forwards;
+}
+
+@keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateX(-50%) translateY(10px);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast.is-leaving {
+    animation: none;
   }
 }
 

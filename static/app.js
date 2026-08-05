@@ -146,4 +146,19 @@
       }, 0);
     });
   });
+
+  // --- Flash toast ---------------------------------------------------------
+  // Success messages after redirects render as a fixed toast (no layout shift).
+  // Without JS the toast still shows; with JS it auto-dismisses.
+
+  document.querySelectorAll("[data-toast]").forEach((toast) => {
+    const dismiss = () => {
+      toast.classList.add("is-leaving");
+      const remove = () => toast.remove();
+      toast.addEventListener("animationend", remove, { once: true });
+      // Fallback if animation is disabled or never fires.
+      setTimeout(remove, 400);
+    };
+    setTimeout(dismiss, 4200);
+  });
 })();

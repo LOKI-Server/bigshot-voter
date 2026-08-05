@@ -40,9 +40,6 @@
   </header>
 
   <main class="wrap" id="main">
-    {% if let Some(msg) = flash %}
-      <div class="flash" role="status">{{ msg }}</div>
-    {% endif %}
     {% block content %}{% endblock %}
   </main>
 
@@ -51,6 +48,10 @@
       <p>One entry and one vote per panel. Change your pick until voting closes.</p>
     </div>
   </footer>
+
+  {% if let Some(msg) = flash %}
+    <div class="toast" role="status" data-toast>{{ msg }}</div>
+  {% endif %}
 
   {% block page_end %}{% endblock %}
 </body>
