@@ -1,12 +1,13 @@
 //! Static assets compiled into the executable.
 //!
-//! The server ships as a *single* file: CSS, JS, and the favicon are baked in
-//! with `include_bytes!`, so there is no `static/` folder to copy next to the
-//! binary and nothing to go missing at runtime.
+//! The server ships as a *single* file: CSS, JS, and the display font are baked
+//! in with `include_bytes!`, so there is no `static/` folder to copy next to the
+//! binary and nothing to go missing at runtime — and a browser on a LAN with no
+//! internet still gets the whole site, fonts included.
 //!
 //! Each asset is exposed at a content-hashed URL (`/static/style.<hash>.css`)
 //! so browsers can cache it forever and still pick up changes after an upgrade.
-//! Templates link to it via [`css_href`] / [`js_href`].
+//! Templates link to it via [`css_href`] / [`js_href`] / [`font_href`].
 
 use std::sync::LazyLock;
 
@@ -47,7 +48,7 @@ impl Asset {
     }
 }
 
-static ASSETS: LazyLock<[Asset; 2]> = LazyLock::new(|| {
+static ASSETS: LazyLock<[Asset; 4]> = LazyLock::new(|| {
     [
         Asset::new(
             "style.css",
@@ -58,6 +59,19 @@ static ASSETS: LazyLock<[Asset; 2]> = LazyLock::new(|| {
             "app.js",
             include_bytes!("../static/app.js"),
             "text/javascript; charset=utf-8",
+        ),
+        // Kavoon (SIL OFL 1.1 — see static/fonts/OFL.txt), split the way Google
+        // Fonts subsets it. `unicode-range` in the stylesheet means a browser
+        // pulls the ext file only when a title actually needs those glyphs.
+        Asset::new(
+            "kavoon-latin.woff2",
+            include_bytes!("../static/fonts/kavoon-latin.woff2"),
+            "font/woff2",
+        ),
+        Asset::new(
+            "kavoon-latin-ext.woff2",
+            include_bytes!("../static/fonts/kavoon-latin-ext.woff2"),
+            "font/woff2",
         ),
     ]
 });
@@ -77,6 +91,16 @@ pub fn css_href() -> &'static str {
 
 pub fn js_href() -> &'static str {
     href("app.js")
+}
+
+/// The subset headings actually hit on every page — worth a `<link rel=preload>`
+/// so it downloads alongside the stylesheet instead of after it.
+pub fn font_href() -> &'static str {
+    href("kavoon-latin.woff2")
+}
+
+pub fn font_ext_href() -> &'static str {
+    href("kavoon-latin-ext.woff2")
 }
 
 /// The site deliberately has no icon. Answer `/favicon.ico` with "no content"

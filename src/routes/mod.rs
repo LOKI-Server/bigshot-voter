@@ -17,6 +17,8 @@ pub fn router() -> Router<AppState> {
         .route("/register", get(auth_routes::register_get).post(auth_routes::register_post))
         .route("/login", get(auth_routes::login_get).post(auth_routes::login_post))
         .route("/logout", post(auth_routes::logout_post))
+        .route("/forgot", get(auth_routes::forgot_get).post(auth_routes::forgot_post))
+        .route("/reset", get(auth_routes::reset_get).post(auth_routes::reset_post))
         .route("/pending", get(pages::pending))
         .route("/settings", get(settings::settings_get))
         .route("/settings/identity", post(settings::update_identity))
@@ -43,4 +45,5 @@ pub fn router() -> Router<AppState> {
         .route("/admin/panels/{id}/open", post(admin::open_panel))
         .route("/admin/users/{id}/approve", post(admin::approve_user))
         .route("/admin/users/{id}/reject", post(admin::reject_user))
+        .route("/admin/resets/{id}/dismiss", post(admin::dismiss_reset))
 }

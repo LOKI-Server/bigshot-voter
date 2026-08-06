@@ -55,6 +55,45 @@
 
 <section>
   <div class="section-head">
+    <h2>Password reset codes</h2>
+    {% if !resets.is_empty() %}<span class="chip"><strong>{{ resets.len() }}</strong>&nbsp;to pass on</span>{% endif %}
+  </div>
+
+  {% if resets.is_empty() %}
+    <div class="empty"><p>Nobody is waiting on a reset code.</p></div>
+  {% else %}
+    <p class="muted">
+      Send the code to the member yourself — chat, text, in person. The app has no
+      mail path. Each code works once and dies with its clock.
+    </p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>Username</th><th>Code</th><th>Asked</th><th>Expires in</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+        {% for r in resets %}
+          <tr>
+            <td><strong>{{ r.username }}</strong></td>
+            <td><code class="reset-code">{{ r.code }}</code></td>
+            <td class="muted">{{ r.created_at }}</td>
+            <td class="muted">{{ r.expires_in }}</td>
+            <td>
+              <form method="post" action="/admin/resets/{{ r.id }}/dismiss" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-small btn-danger">Dismiss</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</section>
+
+<section>
+  <div class="section-head">
     <h2>Panels</h2>
     <a href="/admin/panels/new">New panel →</a>
   </div>

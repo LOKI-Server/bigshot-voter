@@ -2,10 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# viewport-fit=cover is what makes env(safe-area-inset-*) resolve to anything
+     other than 0 — the stylesheet leans on those insets to keep content and the
+     toast clear of a notch and the home indicator. #}
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>{% block title %}Big-Shot Voting{% endblock %}</title>
+  {# Font URLs are content-hashed at startup, so the @font-face rules live here
+     rather than in the (byte-stable, immutably cached) stylesheet. The preload
+     starts the download alongside the CSS instead of after it parses; fonts are
+     always fetched in CORS mode, hence crossorigin even same-origin. #}
+  <link rel="preload" href="{{ crate::assets::font_href() }}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ crate::assets::css_href() }}">
+  <style>
+    @font-face {
+      font-family: "Kavoon";
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url("{{ crate::assets::font_href() }}") format("woff2");
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+        U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: "Kavoon";
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url("{{ crate::assets::font_ext_href() }}") format("woff2");
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+        U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+        U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+  </style>
   <script src="{{ crate::assets::js_href() }}" defer></script>
 </head>
 <body class="{% block body_class %}{% endblock %}">

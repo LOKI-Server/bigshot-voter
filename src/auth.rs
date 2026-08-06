@@ -117,6 +117,53 @@ pub fn validate_password(password: &str) -> Result<(), String> {
     Ok(())
 }
 
+// --- Password reset codes -----------------------------------------------------
+
+/// Reset codes travel by hand — typed into a chat window by the admin, read
+/// back off a phone screen by the member — so the alphabet drops every pair
+/// that looks alike (`0`/`O`, `1`/`I`/`L`, `U`/`V`).
+const RESET_CODE_ALPHABET: &[u8] = b"23456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/// Characters in a code, ignoring the display grouping. 30^12 ≈ 5×10^17 — far
+/// past what an online guesser can walk through before the code expires.
+pub const RESET_CODE_LEN: usize = 12;
+
+/// A fresh code in display form: `A3KD-9F2M-7QXZ`.
+pub fn generate_reset_code() -> String {
+    use rand::Rng;
+
+    let mut rng = rand::thread_rng();
+    let alphabet_len = RESET_CODE_ALPHABET.len();
+    // Largest multiple of the alphabet that fits in a byte. Rejecting above it
+    // keeps every character equally likely (`% 30` alone would favour the first
+    // sixteen).
+    let limit = (256 / alphabet_len * alphabet_len) as u16;
+
+    let mut out = String::with_capacity(RESET_CODE_LEN + RESET_CODE_LEN / 4);
+    for i in 0..RESET_CODE_LEN {
+        if i > 0 && i % 4 == 0 {
+            out.push('-');
+        }
+        let byte = loop {
+            let b: u8 = rng.r#gen();
+            if u16::from(b) < limit {
+                break b;
+            }
+        };
+        out.push(RESET_CODE_ALPHABET[byte as usize % alphabet_len] as char);
+    }
+    out
+}
+
+/// Lookup form of a code: grouping, spaces, and case are all noise.
+pub fn normalize_reset_code(input: &str) -> String {
+    input
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_uppercase())
+        .collect()
+}
+
 // --- Signed session cookie: base64(user_id|exp)|base64(hmac) ------------------
 
 fn sign(secret: &[u8], message: &str) -> String {
@@ -340,4 +387,41 @@ pub fn take_flash(jar: CookieJar) -> (CookieJar, Option<String>) {
         return (jar.add(clear), Some(msg));
     }
     (jar, None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reset_codes_are_grouped_but_normalize_to_a_flat_key() {
+        let code = generate_reset_code();
+        assert_eq!(code.len(), RESET_CODE_LEN + 2, "{code} should be 4-4-4");
+        assert_eq!(code.matches('-').count(), 2);
+
+        let key = normalize_reset_code(&code);
+        assert_eq!(key.len(), RESET_CODE_LEN);
+        assert!(
+            key.bytes().all(|b| RESET_CODE_ALPHABET.contains(&b)),
+            "{key} strayed outside the unambiguous alphabet"
+        );
+
+        // However the member retypes it, it has to hit the same row.
+        for typed in [
+            code.clone(),
+            code.to_lowercase(),
+            code.replace('-', ""),
+            code.replace('-', " "),
+            format!("  {code}  "),
+        ] {
+            assert_eq!(normalize_reset_code(&typed), key, "{typed} did not normalize");
+        }
+    }
+
+    #[test]
+    fn reset_codes_do_not_repeat() {
+        let codes: std::collections::HashSet<String> =
+            (0..64).map(|_| generate_reset_code()).collect();
+        assert_eq!(codes.len(), 64, "generator is not producing fresh codes");
+    }
 }

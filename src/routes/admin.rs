@@ -8,7 +8,9 @@ use crate::auth::{AdminUser, ensure_csrf_cookie, set_flash, take_flash, verify_c
 use crate::error::{AppError, AppResult};
 use crate::models::{MediaType, PanelStatus, UserStatus};
 use crate::routes::pages::panel_summary;
-use crate::templates::{AdminPage, AdminPanelFormPage, NavUser, PendingUserView};
+use crate::templates::{
+    AdminPage, AdminPanelFormPage, NavUser, PasswordResetView, PendingUserView,
+};
 use crate::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -77,12 +79,14 @@ pub async fn dashboard(
     let (jar, flash) = take_flash(jar);
     let (jar, csrf_token) = ensure_csrf_cookie(jar);
 
-    let (pending_raw, panels_raw) = tokio::try_join!(
+    let (pending_raw, resets_raw, panels_raw) = tokio::try_join!(
         crate::db::list_pending_users(&state.pool),
+        crate::db::list_open_password_resets(&state.pool),
         crate::db::list_panel_summaries(&state.pool),
     )?;
 
     let pending = pending_raw.iter().map(PendingUserView::from).collect();
+    let resets = resets_raw.iter().map(PasswordResetView::from).collect();
     let panels = panels_raw.iter().map(panel_summary).collect();
 
     let page = AdminPage {
@@ -90,6 +94,7 @@ pub async fn dashboard(
         flash,
         csrf_token,
         pending,
+        resets,
         panels,
     };
     Ok((jar, Html(page.render()?)).into_response())
@@ -118,6 +123,21 @@ pub async fn reject_user(
     verify_csrf(&jar, Some(form.csrf_token.as_str()))?;
     crate::db::set_user_status(&state.pool, &id, UserStatus::Rejected).await?;
     let jar = set_flash(jar, "User rejected.");
+    Ok((jar, Redirect::to("/admin")).into_response())
+}
+
+/// Drop a reset request the admin does not want to relay (or has already
+/// handled out of band). The code stops working immediately.
+pub async fn dismiss_reset(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    AdminUser(_admin): AdminUser,
+    Path(id): Path<String>,
+    Form(form): Form<CsrfForm>,
+) -> AppResult<Response> {
+    verify_csrf(&jar, Some(form.csrf_token.as_str()))?;
+    crate::db::delete_password_reset(&state.pool, &id).await?;
+    let jar = set_flash(jar, "Reset code dismissed. It can no longer be used.");
     Ok((jar, Redirect::to("/admin")).into_response())
 }
 

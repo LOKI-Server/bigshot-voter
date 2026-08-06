@@ -6,12 +6,13 @@ Admins open **voting panels** (images, audio, video, or other files). Approved m
 
 ## Features
 
-- **Ships as one executable.** CSS, JavaScript, and every HTML template are compiled into the binary — there is no `static/` folder to copy and nothing to go missing.
+- **Ships as one executable.** CSS, JavaScript, the display font, and every HTML template are compiled into the binary — there is no `static/` folder to copy, nothing to go missing, and no third-party request from a member's browser.
 - **Windows system tray** (release builds): starts in the notification area, with Show Console / Exit; minimize returns to the tray, close exits
 - **Markdown panel descriptions**, with an optional **related link**, editable after creation
 - **First account is the sole overseeing admin** (auto-approved)
 - Later users register with username + password and wait for **admin approval**
 - **Account settings**: members change their username or password, and may add an optional **email to sign in with instead of a username**
+- **Forgotten passwords**, without a mail server: the member asks, the admin relays a one-time code, the member sets a new password
 - Only **approved** accounts can view panel content, upload, vote, and fetch media
 - **Capsule tile grid** for entries: uniform previews regardless of source dimensions, a vote button under each one, and click-to-enlarge in a lightbox
 - Secure password storage with **Argon2id**
@@ -239,7 +240,33 @@ one-year immutable cache, so an upgraded binary invalidates them automatically.
 
 Both forms require the current password, since each one edits a sign-in credential.
 No mail is ever sent, so the email is validated structurally rather than confirmed —
-treat it as a convenience alias, not a verified address or a password-reset channel.
+treat it as a convenience alias, not a verified address.
+
+## Forgotten passwords
+
+There is no mail server, so **the admin is the delivery channel**:
+
+1. The member clicks **Forgot password** on `/login` and enters their username or
+   email. The page answers the same way whether or not that account exists, so the
+   form can't be used to fish for usernames.
+2. A one-time code (`Z665-NNQ5-BFDT`) appears in the **Password reset codes**
+   section of `/admin` *and* in the server console. The admin passes it to the
+   member however they already talk — chat, text, in person.
+3. The member returns to `/login` → **Enter a password change code** (or `/reset`
+   directly, which is where step 1 leaves them), types the code and a new password,
+   and signs in. Case, spaces, and dashes in the code are all ignored.
+
+The rules the code plays by:
+
+- **Single use.** Redeeming it spends it; a second attempt is refused.
+- **24 hours**, then it dies whether or not anyone used it.
+- **One live code per account** — asking again retires the previous one.
+- **Dismissible.** The admin can kill a request from the dashboard without
+  relaying it (useful if someone else requested a reset for a member's account).
+- Codes are 12 characters from a 30-character alphabet with the look-alikes
+  (`0`/`O`, `1`/`I`/`L`) removed — ~5×10¹⁷ combinations, and unambiguous to read
+  aloud.
+- **Rejected accounts** never get a code.
 
 ## Security notes
 
@@ -249,6 +276,12 @@ treat it as a convenience alias, not a verified address or a password-reset chan
 - Media is only served to **approved** logged-in users, with `Cache-Control: private`.
 - Changing a password does **not** invalidate sessions on other devices; there is no
   session store to revoke against. Rotate `data/secret.key` to log everyone out.
+  A password *reset* is the same — it locks out the old password, not old sessions.
+- Reset codes are stored in the clear, because the admin has to read one out to
+  relay it. That gives up no ground: the admin can already reach every account.
+  They are swept from the database once used, dismissed, or expired.
+- Responses are gzipped when the client asks; entry media and the font are served
+  as-is rather than re-compressed.
 
 ## Development
 
@@ -264,8 +297,38 @@ both as dependencies, so editing a stylesheet, script, or template triggers a
 rebuild on the next `cargo build` — but the running server won't pick up changes
 until you restart it.
 
-The schema migrates itself on startup, adding columns that older databases predate
-(user emails, the panel related link).
+The schema migrates itself on startup, adding columns and tables that older
+databases predate (user emails, the panel related link, password reset codes).
+
+### Mobile and touch
+
+Two separate axes, deliberately not conflated:
+
+- **`@media (max-width: 720px)` / `(max-width: 420px)`** handle *narrow* — gutters,
+  tile columns, stacked button rows, tighter header.
+- **`@media (pointer: coarse)`** handles *touch*, keyed off the input device rather
+  than the viewport, because a 1024px tablet needs it and a narrow desktop window
+  does not. It raises `--control-h`, sets form controls to **16px** (iOS Safari
+  zooms the page when a focused field is smaller, which shoves the layout sideways
+  mid-form), gives every tappable thing a 44px minimum, and replaces the grey tap
+  flash that reads as a rendering fault on a dark surface.
+- **`@media (hover: none)`** pins the tile "Enlarge" hint open. It is the only
+  signal that a tile opens a lightbox, and on a touchscreen it would otherwise
+  never appear.
+- Page gutters and the footer grow by `env(safe-area-inset-*)` for notched phones.
+  Those only resolve to anything with `viewport-fit=cover` in the viewport meta, so
+  a test asserts the two stay together.
+
+### Typography
+
+Headings, the brand, buttons, and tile titles are set in **Kavoon** (SIL OFL 1.1 —
+`static/fonts/OFL.txt`); everything you actually read a paragraph of stays on the
+system UI sans. The font is subset the way Google Fonts ships it and embedded in
+the binary, so the `@font-face` rules live in `templates/base.html` rather than the
+stylesheet — they need the content-hashed URL that `src/assets.rs` computes at
+startup. Kavoon has a single 400 weight, so every rule that reaches for it also
+sets `font-weight: 400` and `font-synthesis-weight: none`; faux-bold on a face
+that heavy smears.
 
 ## License
 

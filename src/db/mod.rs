@@ -8,7 +8,8 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::models::{
-    Entry, MediaType, Panel, PanelListing, PanelStatus, PendingUser, Role, User, UserStatus,
+    Entry, MediaType, Panel, PanelListing, PanelStatus, PasswordReset, PendingUser, Role, User,
+    UserStatus,
 };
 
 pub async fn connect(db_path: &std::path::Path) -> Result<SqlitePool> {
@@ -88,10 +89,21 @@ async fn migrate(pool: &SqlitePool) -> Result<()> {
             UNIQUE (panel_id, user_id)
         );
 
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id TEXT PRIMARY KEY NOT NULL,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            code TEXT NOT NULL,
+            code_key TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            used_at TEXT
+        );
+
         CREATE INDEX IF NOT EXISTS idx_entries_panel ON entries(panel_id);
         CREATE INDEX IF NOT EXISTS idx_votes_panel ON votes(panel_id);
         CREATE INDEX IF NOT EXISTS idx_votes_entry ON votes(entry_id);
         CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+        CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
         "#,
     )
     .execute(pool)
@@ -144,6 +156,11 @@ async fn add_column_if_missing(
             .await?;
     }
     Ok(())
+}
+
+#[inline]
+fn unix_now() -> i64 {
+    time::OffsetDateTime::now_utc().unix_timestamp()
 }
 
 #[inline]
@@ -338,6 +355,121 @@ pub async fn list_pending_users(pool: &SqlitePool) -> Result<Vec<PendingUser>, s
             created_at: r.get("created_at"),
         })
         .collect())
+}
+
+// --- Password resets ----------------------------------------------------------
+
+/// How long an issued code stays good. The admin relays it by hand, so this is
+/// measured in "before they next sit down", not minutes.
+pub const RESET_CODE_TTL_SECONDS: i64 = 24 * 60 * 60;
+
+/// Issue a code for `user_id`, replacing whatever that account had outstanding.
+///
+/// One live code per account keeps the admin's list honest: a member who asks
+/// twice gets one answer, not a choice of two. Dead rows from every account are
+/// swept in the same transaction so the table never grows without bound.
+pub async fn create_password_reset(
+    pool: &SqlitePool,
+    user_id: &str,
+    code: &str,
+    code_key: &str,
+) -> Result<(), sqlx::Error> {
+    let id = Uuid::new_v4().to_string();
+    let created_at = now_rfc3339();
+    let now = unix_now();
+    let expires_at = now + RESET_CODE_TTL_SECONDS;
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("DELETE FROM password_resets WHERE user_id = ?")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM password_resets WHERE used_at IS NOT NULL OR expires_at <= ?")
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        r#"
+        INSERT INTO password_resets (id, user_id, code, code_key, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        "#,
+    )
+    .bind(&id)
+    .bind(user_id)
+    .bind(code)
+    .bind(code_key)
+    .bind(&created_at)
+    .bind(expires_at)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    Ok(())
+}
+
+/// Resolve a normalized code to `(reset_id, user_id)`, ignoring spent and
+/// expired rows.
+pub async fn find_active_password_reset(
+    pool: &SqlitePool,
+    code_key: &str,
+) -> Result<Option<(String, String)>, sqlx::Error> {
+    let row = sqlx::query(
+        "SELECT id, user_id FROM password_resets
+         WHERE code_key = ? AND used_at IS NULL AND expires_at > ?",
+    )
+    .bind(code_key)
+    .bind(unix_now())
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|r| (r.get("id"), r.get("user_id"))))
+}
+
+/// Spend a code. `false` means someone else already did — the `used_at IS NULL`
+/// guard is what makes a code single-use even under a double submit.
+pub async fn consume_password_reset(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("UPDATE password_resets SET used_at = ? WHERE id = ? AND used_at IS NULL")
+        .bind(now_rfc3339())
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Codes the admin still has to pass on, oldest first.
+pub async fn list_open_password_resets(
+    pool: &SqlitePool,
+) -> Result<Vec<PasswordReset>, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT r.id, r.user_id, u.username, r.code, r.created_at, r.expires_at
+         FROM password_resets r
+         JOIN users u ON u.id = r.user_id
+         WHERE r.used_at IS NULL AND r.expires_at > ?
+         ORDER BY r.created_at ASC",
+    )
+    .bind(unix_now())
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| PasswordReset {
+            id: r.get("id"),
+            user_id: r.get("user_id"),
+            username: r.get("username"),
+            code: r.get("code"),
+            created_at: r.get("created_at"),
+            expires_at: r.get("expires_at"),
+        })
+        .collect())
+}
+
+/// Admin dismissing a request they do not intend to relay.
+pub async fn delete_password_reset(pool: &SqlitePool, id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM password_resets WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn create_panel(

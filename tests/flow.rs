@@ -99,6 +99,52 @@ async fn login(app: &axum::Router, username: &str, password: &str) -> (String, S
     (session, csrf)
 }
 
+/// GET a page anonymously and return `(csrf_value, body)`.
+async fn get_anon(app: &axum::Router, uri: &str) -> (String, String) {
+    let res = app
+        .clone()
+        .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK, "GET {uri}");
+    let csrf = extract_set_cookie(&res, "bigshot_csrf")
+        .expect("csrf cookie")
+        .split_once('=')
+        .unwrap()
+        .1
+        .to_string();
+    (csrf, body_text(res).await)
+}
+
+async fn post_anon(
+    app: &axum::Router,
+    uri: &str,
+    csrf: &str,
+    body: String,
+) -> axum::response::Response {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(uri)
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .header(header::COOKIE, format!("bigshot_csrf={csrf}"))
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+}
+
+fn location(res: &axum::response::Response) -> String {
+    res.headers()
+        .get(header::LOCATION)
+        .expect("redirect carries a Location")
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
 async fn get_html(app: &axum::Router, uri: &str, session: &str, csrf: &str) -> String {
     let res = app
         .clone()
@@ -687,6 +733,319 @@ async fn migration_adds_email_columns_to_a_legacy_database() {
     assert_eq!(user.email.as_deref(), Some("legacy@example.com"));
 }
 
+/// The whole forgotten-password path: member asks, admin relays, member redeems.
+#[tokio::test]
+async fn a_reset_code_travels_through_the_admin_and_changes_the_password() {
+    let (app, _tmp, state) = setup().await;
+
+    db::create_user(
+        &state.pool,
+        "admin",
+        &hash_password("password1").unwrap(),
+        Role::Admin,
+        UserStatus::Approved,
+    )
+    .await
+    .unwrap();
+    let member = db::create_user(
+        &state.pool,
+        "riley",
+        &hash_password("password123").unwrap(),
+        Role::User,
+        UserStatus::Approved,
+    )
+    .await
+    .unwrap();
+    db::update_user_identity(&state.pool, &member.id, "riley", Some("riley@example.com"))
+        .await
+        .unwrap();
+
+    // The login page offers both doors.
+    let (csrf, login_html) = get_anon(&app, "/login").await;
+    assert!(login_html.contains(r#"href="/forgot""#), "no forgot-password link");
+    assert!(login_html.contains(r#"href="/reset""#), "no code-entry link");
+
+    // Ask for a code by email — the same identifier login accepts.
+    let res = post_anon(
+        &app,
+        "/forgot",
+        &csrf,
+        format!("identifier=RILEY@example.com&csrf_token={csrf}"),
+    )
+    .await;
+    assert_eq!(location(&res), "/reset", "should land on the code form");
+
+    let open = db::list_open_password_resets(&state.pool).await.unwrap();
+    assert_eq!(open.len(), 1);
+    let issued = open[0].clone();
+    assert_eq!(issued.username, "riley");
+    assert_eq!(issued.user_id, member.id);
+
+    // The admin can read the code off their dashboard to pass it on.
+    let (admin_session, admin_csrf) = login(&app, "admin", "password1").await;
+    let admin_html = get_html(&app, "/admin", &admin_session, &admin_csrf).await;
+    assert!(
+        admin_html.contains(&issued.code),
+        "admin dashboard should show the code to relay: {admin_html}"
+    );
+
+    // The member retypes it casually — lowercase, no dashes.
+    let typed = issued.code.to_lowercase().replace('-', "");
+    let (csrf, _) = get_anon(&app, "/reset").await;
+    let res = post_anon(
+        &app,
+        "/reset",
+        &csrf,
+        format!(
+            "code={typed}&new_password=brand-new-secret&new_password_confirm=brand-new-secret\
+             &csrf_token={csrf}"
+        ),
+    )
+    .await;
+    assert_eq!(location(&res), "/login");
+
+    let reloaded = db::find_user_by_id(&state.pool, &member.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(verify_password("brand-new-secret", &reloaded.password_hash));
+    assert!(!verify_password("password123", &reloaded.password_hash));
+
+    // Spent: the code is gone from the admin's list and no longer redeemable.
+    assert!(
+        db::list_open_password_resets(&state.pool)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let (csrf, _) = get_anon(&app, "/reset").await;
+    let res = post_anon(
+        &app,
+        "/reset",
+        &csrf,
+        format!(
+            "code={}&new_password=second-attempt-pw&new_password_confirm=second-attempt-pw\
+             &csrf_token={csrf}",
+            issued.code
+        ),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK, "re-use re-renders the form");
+    assert!(body_text(res).await.contains("not valid"));
+
+    let unchanged = db::find_user_by_id(&state.pool, &member.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        verify_password("brand-new-secret", &unchanged.password_hash),
+        "a spent code must not set another password"
+    );
+}
+
+/// The form must answer identically whether or not the account is real, or it
+/// becomes a username oracle.
+#[tokio::test]
+async fn forgot_password_gives_nothing_away() {
+    let (app, _tmp, state) = setup().await;
+
+    let real = db::create_user(
+        &state.pool,
+        "alice",
+        &hash_password("password123").unwrap(),
+        Role::User,
+        UserStatus::Approved,
+    )
+    .await
+    .unwrap();
+    let rejected = db::create_user(
+        &state.pool,
+        "spammer",
+        &hash_password("password123").unwrap(),
+        Role::User,
+        UserStatus::Rejected,
+    )
+    .await
+    .unwrap();
+
+    let mut answers = Vec::new();
+    for identifier in ["alice", "nobody_here", "spammer"] {
+        let (csrf, _) = get_anon(&app, "/forgot").await;
+        let res = post_anon(
+            &app,
+            "/forgot",
+            &csrf,
+            format!("identifier={identifier}&csrf_token={csrf}"),
+        )
+        .await;
+        answers.push((
+            res.status(),
+            location(&res),
+            extract_set_cookie(&res, "bigshot_flash").expect("acknowledgement flash"),
+        ));
+    }
+    assert_eq!(answers[0], answers[1], "unknown account answered differently");
+    assert_eq!(answers[0], answers[2], "rejected account answered differently");
+
+    // Only the live account actually got a code.
+    let open = db::list_open_password_resets(&state.pool).await.unwrap();
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].user_id, real.id);
+    assert_ne!(open[0].user_id, rejected.id);
+}
+
+/// Asking twice must not leave two live codes for one account.
+#[tokio::test]
+async fn a_new_code_retires_the_previous_one() {
+    let (app, _tmp, state) = setup().await;
+
+    db::create_user(
+        &state.pool,
+        "alice",
+        &hash_password("password123").unwrap(),
+        Role::User,
+        UserStatus::Approved,
+    )
+    .await
+    .unwrap();
+
+    let mut codes = Vec::new();
+    for _ in 0..2 {
+        let (csrf, _) = get_anon(&app, "/forgot").await;
+        post_anon(
+            &app,
+            "/forgot",
+            &csrf,
+            format!("identifier=alice&csrf_token={csrf}"),
+        )
+        .await;
+        let open = db::list_open_password_resets(&state.pool).await.unwrap();
+        assert_eq!(open.len(), 1, "only one code may be live per account");
+        codes.push(open[0].code.clone());
+    }
+    assert_ne!(codes[0], codes[1]);
+
+    // The retired code is dead even though it never expired.
+    let (csrf, _) = get_anon(&app, "/reset").await;
+    let res = post_anon(
+        &app,
+        "/reset",
+        &csrf,
+        format!(
+            "code={}&new_password=should-not-work&new_password_confirm=should-not-work\
+             &csrf_token={csrf}",
+            codes[0]
+        ),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(body_text(res).await.contains("not valid"));
+}
+
+/// Dismissing from the dashboard kills the code without touching the account.
+#[tokio::test]
+async fn an_admin_can_dismiss_a_reset_request() {
+    let (app, _tmp, state) = setup().await;
+
+    db::create_user(
+        &state.pool,
+        "admin",
+        &hash_password("password1").unwrap(),
+        Role::Admin,
+        UserStatus::Approved,
+    )
+    .await
+    .unwrap();
+    let member = db::create_user(
+        &state.pool,
+        "alice",
+        &hash_password("password123").unwrap(),
+        Role::User,
+        UserStatus::Approved,
+    )
+    .await
+    .unwrap();
+
+    let (csrf, _) = get_anon(&app, "/forgot").await;
+    post_anon(
+        &app,
+        "/forgot",
+        &csrf,
+        format!("identifier=alice&csrf_token={csrf}"),
+    )
+    .await;
+    let issued = db::list_open_password_resets(&state.pool).await.unwrap()[0].clone();
+
+    // A member must not be able to clear someone's request.
+    let (member_session, member_csrf) = login(&app, "alice", "password123").await;
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/admin/resets/{}/dismiss", issued.id))
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .header(
+                    header::COOKIE,
+                    format!("bigshot_session={member_session}; bigshot_csrf={member_csrf}"),
+                )
+                .body(Body::from(format!("csrf_token={member_csrf}")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        db::list_open_password_resets(&state.pool).await.unwrap().len(),
+        1
+    );
+
+    let (admin_session, admin_csrf) = login(&app, "admin", "password1").await;
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/admin/resets/{}/dismiss", issued.id))
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .header(
+                    header::COOKIE,
+                    format!("bigshot_session={admin_session}; bigshot_csrf={admin_csrf}"),
+                )
+                .body(Body::from(format!("csrf_token={admin_csrf}")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(location(&res), "/admin");
+    assert!(
+        db::list_open_password_resets(&state.pool)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+
+    // The dismissed code buys nothing.
+    let (csrf, _) = get_anon(&app, "/reset").await;
+    let res = post_anon(
+        &app,
+        "/reset",
+        &csrf,
+        format!(
+            "code={}&new_password=should-not-work&new_password_confirm=should-not-work\
+             &csrf_token={csrf}",
+            issued.code
+        ),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let still = db::find_user_by_id(&state.pool, &member.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(verify_password("password123", &still.password_hash));
+}
+
 #[tokio::test]
 async fn panel_info_can_be_edited_and_description_renders_markdown() {
     let (app, _tmp, state) = setup().await;
@@ -891,6 +1250,110 @@ async fn embedded_assets_are_served_from_the_binary() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_MODIFIED);
+}
+
+/// The display font is part of the binary, like the CSS — a browser on a LAN
+/// with no internet must still get Kavoon.
+#[tokio::test]
+async fn the_display_font_ships_inside_the_binary() {
+    let (app, _tmp, _state) = setup().await;
+
+    let res = app
+        .clone()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let html = body_text(res).await;
+
+    let font_href = bigshot_voter::assets::font_href();
+    assert!(html.contains(font_href), "page should reference {font_href}");
+    assert!(
+        html.contains(r#"rel="preload""#) && html.contains(r#"as="font""#),
+        "the font should be preloaded"
+    );
+    assert!(
+        !html.contains("fonts.googleapis.com") && !html.contains("fonts.gstatic.com"),
+        "no page may reach out to a third party for its fonts"
+    );
+
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri(font_href)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "font/woff2"
+    );
+    let bytes = res.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(&bytes[..4], b"wOF2", "served bytes are not a woff2 file");
+}
+
+/// `env(safe-area-inset-*)` quietly resolves to `0px` unless the page opts in
+/// with `viewport-fit=cover`, so the stylesheet and the viewport meta have to
+/// travel together — dropping the meta breaks notch handling with no error.
+#[tokio::test]
+async fn safe_area_insets_are_switched_on() {
+    let css = include_str!("../static/style.css");
+    if !css.contains("env(safe-area-inset") {
+        return;
+    }
+
+    let (app, _tmp, _state) = setup().await;
+    let res = app
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let html = body_text(res).await;
+    assert!(
+        html.contains("viewport-fit=cover"),
+        "the stylesheet uses safe-area insets, so the viewport meta must enable them"
+    );
+}
+
+/// Markup compresses; already-packed bytes are left alone.
+#[tokio::test]
+async fn text_is_compressed_and_binaries_are_not() {
+    let (app, _tmp, _state) = setup().await;
+
+    let encoding = |res: &axum::response::Response| {
+        res.headers()
+            .get(header::CONTENT_ENCODING)
+            .map(|v| v.to_str().unwrap().to_string())
+    };
+
+    for uri in ["/", bigshot_voter::assets::css_href()] {
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .header(header::ACCEPT_ENCODING, "gzip")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(encoding(&res).as_deref(), Some("gzip"), "{uri} sent raw");
+    }
+
+    // woff2 is a compressed container already — re-packing it is pure CPU.
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri(bigshot_voter::assets::font_href())
+                .header(header::ACCEPT_ENCODING, "gzip")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(encoding(&res), None, "the font should not be re-compressed");
 }
 
 #[tokio::test]

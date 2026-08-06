@@ -3,7 +3,9 @@
 use askama::Template;
 
 use crate::media::{accept_attr, allowed_ext_list};
-use crate::models::{Entry, MediaType, Panel, PendingUser, format_created_at};
+use crate::models::{
+    Entry, MediaType, Panel, PasswordReset, PendingUser, format_created_at, format_time_left,
+};
 
 /// Minimal user info for nav chrome.
 #[derive(Debug, Clone)]
@@ -65,6 +67,26 @@ pub struct LoginPage {
     pub flash: Option<String>,
     pub csrf_token: String,
     pub error: Option<String>,
+}
+
+#[derive(Template)]
+#[template(path = "forgot_password.html")]
+pub struct ForgotPasswordPage {
+    pub user: Option<NavUser>,
+    pub flash: Option<String>,
+    pub csrf_token: String,
+    pub error: Option<String>,
+}
+
+#[derive(Template)]
+#[template(path = "reset_password.html")]
+pub struct ResetPasswordPage {
+    pub user: Option<NavUser>,
+    pub flash: Option<String>,
+    pub csrf_token: String,
+    pub error: Option<String>,
+    /// Echoed back so a rejected attempt doesn't make them retype the code.
+    pub code: String,
 }
 
 #[derive(Template)]
@@ -242,6 +264,7 @@ pub struct AdminPage {
     pub flash: Option<String>,
     pub csrf_token: String,
     pub pending: Vec<PendingUserView>,
+    pub resets: Vec<PasswordResetView>,
     pub panels: Vec<PanelSummary>,
 }
 
@@ -258,6 +281,30 @@ impl From<&PendingUser> for PendingUserView {
             id: p.id.clone(),
             username: p.username.clone(),
             created_at: format_created_at(&p.created_at),
+        }
+    }
+}
+
+/// One row of the admin's "hand this code over" list.
+#[derive(Debug, Clone)]
+pub struct PasswordResetView {
+    pub id: String,
+    pub username: String,
+    pub code: String,
+    pub created_at: String,
+    /// How much of the code's life is left (`23 hours`).
+    pub expires_in: String,
+}
+
+impl From<&PasswordReset> for PasswordResetView {
+    fn from(r: &PasswordReset) -> Self {
+        let left = r.expires_at - time::OffsetDateTime::now_utc().unix_timestamp();
+        Self {
+            id: r.id.clone(),
+            username: r.username.clone(),
+            code: r.code.clone(),
+            created_at: format_created_at(&r.created_at),
+            expires_in: format_time_left(left),
         }
     }
 }

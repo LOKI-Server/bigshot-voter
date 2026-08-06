@@ -39,9 +39,34 @@
 
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 
-  color-scheme: dark;
-  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system,
+  /* Two faces, two jobs. --font-ui carries everything you *read*: body copy,
+     form fields, tables, hints. --font-display carries everything you *scan*:
+     titles, the brand, buttons. Kavoon is a heavy display face and only ships a
+     400 weight, so every rule that reaches for it also pins font-weight to 400
+     and refuses synthetic bolding — faux-bold on a face this heavy smears. */
+  --font-ui: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system,
     "Inter", sans-serif;
+  --font-display: "Kavoon", "Segoe UI Variable Display", "Segoe UI", system-ui,
+    -apple-system, sans-serif;
+
+  color-scheme: dark;
+  font-family: var(--font-ui);
+}
+
+/* Applied wherever the display face is used. Kept in one place so the weight
+   and tracking corrections can never drift apart from each other. */
+.brand,
+h1,
+h2,
+h3,
+.btn,
+.tile-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-synthesis-weight: none;
+  /* Kavoon's own sidebearings are generous; the UI font's negative tracking
+     would jam it together. */
+  letter-spacing: 0;
 }
 
 *,
@@ -114,7 +139,6 @@ h1,
 h2,
 h3 {
   line-height: 1.18;
-  letter-spacing: -0.015em;
   margin: 0 0 0.5rem;
 }
 h1 {
@@ -170,10 +194,8 @@ p {
 }
 
 .brand {
-  font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   color: var(--text);
-  letter-spacing: -0.01em;
 }
 .brand:hover {
   color: var(--text);
@@ -449,8 +471,6 @@ section + section {
   gap: 0.45rem;
   background: linear-gradient(180deg, var(--accent-soft), var(--accent));
   color: var(--accent-ink);
-  font-weight: 650;
-  font-family: inherit;
   border: none;
   border-radius: var(--radius-sm);
   padding: 0.58rem 1.05rem;
@@ -704,17 +724,30 @@ section + section {
 }
 .form input[type="file"]::file-selector-button {
   font: inherit;
+  /* `font: inherit` brings line-height with it, and the line-height above is a
+     whole control tall — it is what centres “No file chosen”. Inherited onto
+     the button it stacked with the padding and pushed a ~50px button inside a
+     42px field, which is why this control used to sit oddly in the row. */
+  line-height: 1.4;
   font-size: 0.86rem;
+  font-weight: 500;
   margin-right: 0.7rem;
-  padding: 0.3rem 0.8rem;
+  padding: 0.34rem 0.85rem;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--surface-3);
+  /* Reads as a button rather than a flat chip, without changing its box. */
+  box-shadow: inset 0 0 0 1px var(--line-strong);
   color: var(--text);
   cursor: pointer;
+  transition: background 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 .form input[type="file"]::file-selector-button:hover {
   background: var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.form input[type="file"]:focus-visible::file-selector-button {
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .hint {
   font-weight: 400;
@@ -966,6 +999,25 @@ code.path {
   padding: 0.05em 0.3em;
 }
 
+/* Reset codes are read off one screen and typed into another, so both ends get
+   monospace and generous letter spacing. */
+.reset-code,
+.form input.code-input {
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.reset-code {
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  border: 1px solid var(--line-strong);
+  color: var(--accent-soft);
+  font-size: 0.95em;
+  user-select: all;
+}
+
 /* --- Entry tiles ----------------------------------------------------------- */
 
 .tile-grid {
@@ -1132,8 +1184,7 @@ code.path {
   min-height: 2.55rem;
 }
 .tile-title {
-  font-weight: 650;
-  font-size: 0.98rem;
+  font-size: 1rem;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1370,6 +1421,101 @@ code.path {
   }
   .nav-user {
     max-width: 8rem;
+  }
+  .card {
+    padding: 1.15rem 1rem;
+  }
+  /* A row of buttons that no longer fits side by side should stack full width
+     rather than shrink into two unhittable slivers. */
+  .form-actions .btn {
+    flex: 1 1 auto;
+  }
+  .settings-grid {
+    margin-top: 1.5rem;
+  }
+  .signout {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9rem;
+  }
+}
+
+/* Landscape on a notched phone puts the display cutout beside the content, so
+   the page gutters have to grow by however much the OS says is unsafe. Paired
+   with viewport-fit=cover in the page head; without it these all resolve to 0. */
+.wrap {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.site-footer {
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 420px) {
+  .header-inner {
+    gap: 0.5rem;
+  }
+  .brand {
+    font-size: 0.98rem;
+  }
+  .nav {
+    gap: 0.15rem;
+  }
+  .nav-link {
+    padding: 0.4rem 0.5rem;
+  }
+  /* Five columns of reset codes and pending accounts cannot fit a phone; the
+     wrapper scrolls, so stop the cells collapsing to one word per line. */
+  .table th,
+  .table td {
+    white-space: nowrap;
+  }
+}
+
+/* --- Touch ------------------------------------------------------------------
+   Keyed off the pointer, not the viewport: a 1024px tablet needs these as much
+   as a phone does, and a narrow desktop window needs none of them. */
+@media (pointer: coarse) {
+  :root {
+    /* Roomier controls, and 16px text inside them — iOS Safari zooms the whole
+       page when a focused field is smaller than that, which shoves the layout
+       sideways mid-form. */
+    --control-h: 2.9rem;
+  }
+  .form input:not([type="checkbox"], [type="radio"], [type="submit"], [type="button"], [type="reset"], [type="range"], [type="color"], [type="hidden"]),
+  .form select,
+  .form textarea {
+    font-size: 16px;
+  }
+  /* Comfortable minimum for a finger, applied to everything tappable. */
+  .btn,
+  .bar-btn,
+  .linkish,
+  .nav-link,
+  .nav-user {
+    min-height: 44px;
+  }
+  .btn-small {
+    padding: 0.5rem 0.9rem;
+  }
+  .actions {
+    gap: 0.5rem;
+  }
+  /* Grey flash on tap looks like a rendering fault against a dark surface. */
+  a,
+  button,
+  .tile-media,
+  summary {
+    -webkit-tap-highlight-color: var(--accent-glow);
+  }
+}
+
+/* Anything revealed by hover is invisible on a touchscreen. The enlarge hint is
+   the only signal that a tile opens a lightbox, so on those devices it stays up. */
+@media (hover: none) {
+  .tile-zoom {
+    opacity: 1;
+    transform: none;
   }
 }
 

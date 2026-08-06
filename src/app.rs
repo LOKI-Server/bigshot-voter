@@ -7,6 +7,8 @@ use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, header};
 use axum::routing::get;
 use sqlx::SqlitePool;
+use tower_http::compression::predicate::{DefaultPredicate, NotForContentType, Predicate};
+use tower_http::compression::CompressionLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 
@@ -34,6 +36,18 @@ pub fn build_router(state: AppState) -> Router {
         .route("/static/{file}", get(assets::serve))
         .route("/favicon.ico", get(assets::no_favicon))
         .layer(DefaultBodyLimit::max(body_limit))
+        // HTML and CSS gzip to roughly a fifth of their size; the uploads do
+        // not, so entry media is excluded rather than burning CPU re-packing
+        // an MP4. (Images and woff2 are already out via `DefaultPredicate`.)
+        .layer(
+            CompressionLayer::new().gzip(true).compress_when(
+                DefaultPredicate::new()
+                    .and(NotForContentType::const_new("video/"))
+                    .and(NotForContentType::const_new("audio/"))
+                    .and(NotForContentType::const_new("font/"))
+                    .and(NotForContentType::const_new("application/octet-stream")),
+            ),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(SetResponseHeaderLayer::if_not_present(
             header::X_CONTENT_TYPE_OPTIONS,
