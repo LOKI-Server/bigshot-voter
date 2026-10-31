@@ -87,7 +87,7 @@ cargo test
 ```
 
 Run the checks locally; this repository has no CI workflows. LOKI's independent
-`scripts/wasi-smoke.py --loki PATH --package PACKAGE.loki-app` exercises
+`cargo xtask wasi-smoke --loki PATH --package PACKAGE.loki-app` (run from LOKI's checkout) exercises
 actual component installation, shared sign-in, panels, uploads, voting, role and
 access revocation, failed-update rollback, and backup/restore with temporary data.
 
