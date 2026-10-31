@@ -3,5 +3,6 @@
 /data
 **/*.rs.bk
 .DS_Store
-# Inno / packaging scratch (outputs land under target/windows-installer)
-/packaging/windows/Output
+*.loki-app
+__pycache__/
+*.pyc

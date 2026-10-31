@@ -10,28 +10,13 @@
     Open a panel for images, music, videos, or files. Approved members upload one
     entry each and cast one vote. They can change their pick right up until voting closes.
   </p>
-  {% if needs_bootstrap %}
-    <p class="callout">
-      <strong>Nobody has registered yet.</strong>
-      The first account becomes the overseeing admin.
-    </p>
-    <div class="stack"><a class="btn" href="/register">Create the admin account</a></div>
-  {% else if user.is_none() %}
+  {% if let Some(u) = user %}
     <div class="stack">
-      <a class="btn" href="/register">Request an account</a>
-      <a class="btn btn-ghost" href="/login">Log in</a>
+      <a class="btn" href="/panels">Browse panels</a>
+      {% if u.is_admin %}<a class="btn btn-ghost" href="/admin">Admin dashboard</a>{% endif %}
     </div>
-  {% else if let Some(u) = user %}
-    {% if u.is_pending %}
-      <p class="callout">Your account is waiting for admin approval.</p>
-    {% else if u.is_approved %}
-      <div class="stack">
-        <a class="btn" href="/panels">Browse panels</a>
-        {% if u.is_admin %}
-          <a class="btn btn-ghost" href="/admin">Admin dashboard</a>
-        {% endif %}
-      </div>
-    {% endif %}
+  {% else %}
+    <div class="stack"><a class="btn" href="/login">Sign in with LOKI</a></div>
   {% endif %}
 </section>
 

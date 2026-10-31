@@ -47,9 +47,7 @@ fn is_safe_url(url: &str) -> bool {
     // Relative, root-relative, and fragment links carry no scheme at all.
     // A scheme must appear before any '/', '?' or '#' to count as one.
     let scheme_end = trimmed.find(':');
-    let path_start = trimmed
-        .find(['/', '?', '#'])
-        .unwrap_or(trimmed.len());
+    let path_start = trimmed.find(['/', '?', '#']).unwrap_or(trimmed.len());
     match scheme_end {
         Some(i) if i < path_start => {
             let scheme = trimmed[..i].to_ascii_lowercase();

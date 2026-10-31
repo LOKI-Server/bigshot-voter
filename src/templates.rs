@@ -3,9 +3,7 @@
 use askama::Template;
 
 use crate::media::{accept_attr, allowed_ext_list};
-use crate::models::{
-    Entry, MediaType, Panel, PasswordReset, PendingUser, format_created_at, format_time_left,
-};
+use crate::models::{Entry, MediaType, Panel};
 
 /// Minimal user info for nav chrome.
 #[derive(Debug, Clone)]
@@ -13,18 +11,6 @@ pub struct NavUser {
     pub username: String,
     pub is_admin: bool,
     pub is_approved: bool,
-    pub is_pending: bool,
-}
-
-impl From<&crate::models::User> for NavUser {
-    fn from(u: &crate::models::User) -> Self {
-        Self {
-            username: u.username.clone(),
-            is_admin: u.is_admin(),
-            is_approved: u.is_approved(),
-            is_pending: u.is_pending(),
-        }
-    }
 }
 
 #[derive(Template)]
@@ -34,7 +20,6 @@ pub struct HomePage {
     pub flash: Option<String>,
     pub csrf_token: String,
     pub panels: Vec<PanelSummary>,
-    pub needs_bootstrap: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -48,66 +33,6 @@ pub struct PanelSummary {
     pub is_open: bool,
     pub entry_count: i64,
     pub vote_count: i64,
-}
-
-#[derive(Template)]
-#[template(path = "register.html")]
-pub struct RegisterPage {
-    pub user: Option<NavUser>,
-    pub flash: Option<String>,
-    pub csrf_token: String,
-    pub error: Option<String>,
-    pub is_first_user: bool,
-}
-
-#[derive(Template)]
-#[template(path = "login.html")]
-pub struct LoginPage {
-    pub user: Option<NavUser>,
-    pub flash: Option<String>,
-    pub csrf_token: String,
-    pub error: Option<String>,
-}
-
-#[derive(Template)]
-#[template(path = "forgot_password.html")]
-pub struct ForgotPasswordPage {
-    pub user: Option<NavUser>,
-    pub flash: Option<String>,
-    pub csrf_token: String,
-    pub error: Option<String>,
-}
-
-#[derive(Template)]
-#[template(path = "reset_password.html")]
-pub struct ResetPasswordPage {
-    pub user: Option<NavUser>,
-    pub flash: Option<String>,
-    pub csrf_token: String,
-    pub error: Option<String>,
-    /// Echoed back so a rejected attempt doesn't make them retype the code.
-    pub code: String,
-}
-
-#[derive(Template)]
-#[template(path = "pending.html")]
-pub struct PendingPage {
-    pub user: Option<NavUser>,
-    pub flash: Option<String>,
-    pub csrf_token: String,
-}
-
-#[derive(Template)]
-#[template(path = "settings.html")]
-pub struct SettingsPage {
-    pub user: Option<NavUser>,
-    pub flash: Option<String>,
-    pub csrf_token: String,
-    pub username: String,
-    /// Empty when the account has no sign-in email.
-    pub email: String,
-    pub identity_error: Option<String>,
-    pub password_error: Option<String>,
 }
 
 #[derive(Template)]
@@ -263,50 +188,7 @@ pub struct AdminPage {
     pub user: Option<NavUser>,
     pub flash: Option<String>,
     pub csrf_token: String,
-    pub pending: Vec<PendingUserView>,
-    pub resets: Vec<PasswordResetView>,
     pub panels: Vec<PanelSummary>,
-}
-
-#[derive(Debug, Clone)]
-pub struct PendingUserView {
-    pub id: String,
-    pub username: String,
-    pub created_at: String,
-}
-
-impl From<&PendingUser> for PendingUserView {
-    fn from(p: &PendingUser) -> Self {
-        Self {
-            id: p.id.clone(),
-            username: p.username.clone(),
-            created_at: format_created_at(&p.created_at),
-        }
-    }
-}
-
-/// One row of the admin's "hand this code over" list.
-#[derive(Debug, Clone)]
-pub struct PasswordResetView {
-    pub id: String,
-    pub username: String,
-    pub code: String,
-    pub created_at: String,
-    /// How much of the code's life is left (`23 hours`).
-    pub expires_in: String,
-}
-
-impl From<&PasswordReset> for PasswordResetView {
-    fn from(r: &PasswordReset) -> Self {
-        let left = r.expires_at - time::OffsetDateTime::now_utc().unix_timestamp();
-        Self {
-            id: r.id.clone(),
-            username: r.username.clone(),
-            code: r.code.clone(),
-            created_at: format_created_at(&r.created_at),
-            expires_in: format_time_left(left),
-        }
-    }
 }
 
 /// Shared by "new panel" and "edit panel" — the only differences are the form
@@ -430,8 +312,10 @@ mod tests {
 
         // A closed panel where nobody voted has no winner.
         let empty = [entry("a", "x", 0), entry("b", "y", 0)];
-        assert!(EntryView::build(&empty, None, None, false)
-            .iter()
-            .all(|v| !v.is_winner));
+        assert!(
+            EntryView::build(&empty, None, None, false)
+                .iter()
+                .all(|v| !v.is_winner)
+        );
     }
 }

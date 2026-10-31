@@ -53,17 +53,13 @@
             <a class="nav-link" href="/admin">Admin</a>
           {% endif %}
           <a class="nav-user" href="/settings" title="Account settings">{{ u.username }}</a>
-          {# Log out lives at the bottom of /settings. Rejected accounts can't
-             open that page, so keep a way out for them here. #}
-          {% if !u.is_approved && !u.is_pending %}
-            <form class="inline" method="post" action="/logout">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button type="submit" class="linkish">Log out</button>
-            </form>
-          {% endif %}
+          <form class="inline" method="post" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="linkish">Log out</button>
+          </form>
         {% else %}
           <a class="nav-link" href="/login">Log in</a>
-          <a class="btn btn-small" href="/register">Register</a>
+          <a class="btn btn-small" href="/login">Sign in with LOKI</a>
         {% endif %}
       </nav>
     </div>

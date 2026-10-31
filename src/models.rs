@@ -4,57 +4,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Role {
-    Admin,
-    User,
-}
-
-impl Role {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Role::Admin => "admin",
-            Role::User => "user",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "admin" => Some(Role::Admin),
-            "user" => Some(Role::User),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum UserStatus {
-    Pending,
-    Approved,
-    Rejected,
-}
-
-impl UserStatus {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            UserStatus::Pending => "pending",
-            UserStatus::Approved => "approved",
-            UserStatus::Rejected => "rejected",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "pending" => Some(UserStatus::Pending),
-            "approved" => Some(UserStatus::Approved),
-            "rejected" => Some(UserStatus::Rejected),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
 pub enum MediaType {
     Image,
     Audio,
@@ -127,28 +76,6 @@ pub fn format_created_at(rfc3339: &str) -> String {
     }
 }
 
-/// Render a countdown for the admin's reset list (`23 hours`, `4 minutes`).
-/// Deliberately coarse — the admin only needs to know whether it is worth
-/// relaying the code or issuing a fresh one.
-pub fn format_time_left(seconds: i64) -> String {
-    if seconds <= 0 {
-        return "expired".to_string();
-    }
-    if seconds < 60 {
-        return "under a minute".to_string();
-    }
-    let (value, unit) = if seconds < 3600 {
-        (seconds / 60, "minute")
-    } else {
-        (seconds / 3600, "hour")
-    };
-    if value == 1 {
-        format!("1 {unit}")
-    } else {
-        format!("{value} {unit}s")
-    }
-}
-
 /// Render a byte count as a short human-readable size (`32 MB`, `1.5 GB`).
 pub fn format_bytes(bytes: u64) -> String {
     const UNITS: [&str; 4] = ["bytes", "KB", "MB", "GB"];
@@ -164,36 +91,6 @@ pub fn format_bytes(bytes: u64) -> String {
         format!("{value:.1} {}", UNITS[unit])
     } else {
         format!("{} {}", value.round(), UNITS[unit])
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct User {
-    pub id: String,
-    pub username: String,
-    /// Optional alternative sign-in identifier.
-    pub email: Option<String>,
-    pub password_hash: String,
-    pub role: Role,
-    pub status: UserStatus,
-    /// RFC3339 timestamp
-    pub created_at: String,
-}
-
-impl User {
-    #[inline]
-    pub fn is_admin(&self) -> bool {
-        self.role == Role::Admin
-    }
-
-    #[inline]
-    pub fn is_approved(&self) -> bool {
-        self.status == UserStatus::Approved
-    }
-
-    #[inline]
-    pub fn is_pending(&self) -> bool {
-        self.status == UserStatus::Pending
     }
 }
 
@@ -253,46 +150,4 @@ impl Entry {
             .as_ref()
             .is_some_and(|p| !p.is_empty())
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn time_left_reads_naturally_at_every_scale() {
-        assert_eq!(format_time_left(-5), "expired");
-        assert_eq!(format_time_left(0), "expired");
-        assert_eq!(format_time_left(30), "under a minute");
-        assert_eq!(format_time_left(60), "1 minute");
-        assert_eq!(format_time_left(3599), "59 minutes");
-        assert_eq!(format_time_left(3600), "1 hour");
-        assert_eq!(format_time_left(24 * 3600), "24 hours");
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PendingUser {
-    pub id: String,
-    pub username: String,
-    /// RFC3339 timestamp
-    pub created_at: String,
-}
-
-/// An outstanding password reset waiting on the admin to relay its code.
-///
-/// The code is stored in the clear because the admin has to read it out and
-/// pass it on by hand — there is no mail path in this app. That is no loss of
-/// ground: the admin can already reach every account.
-#[derive(Debug, Clone)]
-pub struct PasswordReset {
-    pub id: String,
-    pub user_id: String,
-    pub username: String,
-    /// Grouped display form, exactly as the member has to type it back.
-    pub code: String,
-    /// RFC3339 timestamp
-    pub created_at: String,
-    /// Unix seconds. Past this the code is dead even if never used.
-    pub expires_at: i64,
 }
