@@ -7,11 +7,13 @@ panels, entries, optional source files, and votes.
 
 ## Development prerequisites
 
-Check out LOKI as a sibling directory named `LOKI`. During initial development,
-`Cargo.toml` points to `../LOKI/crates/loki-sdk` with version `0.1.0`; the SDK
-and tool have not been published to crates.io. This dependency is the public SDK,
-with no use of server implementation modules. After publication it can become a
-registry-only dependency.
+Bigshot 0.6 needs LOKI 0.3 or later. It is built with `loki-sdk` 0.3, which uses
+LOKI 0.3's typed host API; LOKI refuses packages built with an older SDK.
+
+Check out LOKI as a sibling directory named `LOKI`. `Cargo.toml` points to
+`../LOKI/crates/loki-sdk` with version `0.3.0`, so it builds before that SDK
+release reaches crates.io. This dependency is the public SDK, with no use of
+server implementation modules. Once 0.3.0 is published, the `path` can go.
 
 From the LOKI checkout, install the tool and build the server:
 
@@ -32,7 +34,7 @@ rustup target add wasm32-wasip2
 cargo loki package
 ```
 
-Import `target/loki/bigshot-voter-0.5.0.loki-app` through LOKI's Applications
+Import `target/loki/bigshot-voter-0.6.0.loki-app` through LOKI's Applications
 page and enable it. This is one package for all supported host operating systems
 and CPU architectures, with no separately installed Wasmtime or app server.
 
@@ -93,5 +95,5 @@ access revocation, failed-update rollback, and backup/restore with temporary dat
 
 Bigshot is a plugin only: it no longer includes standalone server/account code,
 a separate component crate, a manifest JSON file, or a Python packager. Cargo
-metadata is the package source of truth. App version stays at its existing
-`0.5.0`; LOKI and its tooling remain `0.1.0`.
+metadata is the package source of truth; `cargo loki package` also records the
+SDK version in the package, which LOKI checks before installing it.
