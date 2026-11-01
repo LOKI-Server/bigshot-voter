@@ -11,7 +11,7 @@ readme = "README.md"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-loki-sdk = { version = "0.3.0", path = "../LOKI/crates/loki-sdk", features = ["templates"] }
+loki-sdk = { version = "0.3", features = ["templates"] }
 askama = { version = "0.12", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -19,7 +19,7 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 time = { version = "0.3", features = ["formatting"] }
 
 [dev-dependencies]
-loki-sdk = { version = "0.3.0", path = "../LOKI/crates/loki-sdk", features = ["templates", "testing"] }
+loki-sdk = { version = "0.3", features = ["templates", "testing"] }
 
 [package.metadata.loki]
 id = "bigshot-voter"

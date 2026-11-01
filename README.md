@@ -5,27 +5,20 @@ identity, permissions, SQLite, streamed uploads/downloads, configuration, and
 package lifecycle management. Bigshot keeps its voting UI, Markdown, media rules,
 panels, entries, optional source files, and votes.
 
-## Development prerequisites
+Bigshot 0.6 runs on LOKI 0.3 or later.
 
-Bigshot 0.6 needs LOKI 0.3 or later. It is built with `loki-sdk` 0.3, which uses
-LOKI 0.3's typed host API; LOKI refuses packages built with an older SDK.
-
-Check out LOKI as a sibling directory named `LOKI`. `Cargo.toml` points to
-`../LOKI/crates/loki-sdk` with version `0.3.0`, so it builds before that SDK
-release reaches crates.io. This dependency is the public SDK, with no use of
-server implementation modules. Once 0.3.0 is published, the `path` can go.
-
-From the LOKI checkout, install the tool and build the server:
+## Development
 
 ```powershell
-cargo install --path crates/cargo-loki --locked
-cargo build -p loki-server
+rustup target add wasm32-wasip2
+cargo install cargo-loki --locked
+cargo loki dev --server PATH_TO_LOKI_SERVER
 ```
 
-From this repository, run `cargo loki dev --server ../LOKI/target/debug/loki-server.exe`
-(omit `.exe` on Linux/macOS). The tool creates a separate local installation,
-prints development credentials, and watches code/templates/assets. Ctrl+C stops
-it. Use `cargo loki check` or `cargo loki build` for shorter compile loops.
+`cargo loki dev` needs a `loki-server` executable, from a LOKI release or your own
+build. It runs a separate local installation, prints development credentials,
+and rebuilds on changes to code, templates and assets. Ctrl+C stops it. Use
+`cargo loki check` or `cargo loki build` for shorter compile loops.
 
 ## Build and install
 
@@ -88,10 +81,10 @@ cargo clippy --target wasm32-wasip2 -- -D warnings
 cargo test
 ```
 
-Run the checks locally; this repository has no CI workflows. LOKI's independent
-`cargo xtask wasi-smoke --loki PATH --package PACKAGE.loki-app` (run from LOKI's checkout) exercises
-actual component installation, shared sign-in, panels, uploads, voting, role and
-access revocation, failed-update rollback, and backup/restore with temporary data.
+Run the checks locally; this repository has no CI workflows. LOKI's own
+`cargo xtask wasi-smoke` installs a Bigshot package in a temporary LOKI and
+exercises sign-in, panels, uploads, voting, revoked access, failed-update
+rollback, and backup and restore.
 
 Bigshot is a plugin only: it no longer includes standalone server/account code,
 a separate component crate, a manifest JSON file, or a Python packager. Cargo

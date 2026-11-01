@@ -175,6 +175,8 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 [[package]]
 name = "loki-sdk"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1edd3194595b1ea9604dada8b78422f7a79a969673f9e86df70fcb3db03f20ec"
 dependencies = [
  "askama",
  "base64",
