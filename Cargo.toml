@@ -3,6 +3,7 @@ name = "bigshot-voter"
 version = "0.6.0"
 edition = "2024"
 license = "MIT"
+repository = "https://github.com/LOKI-Server/bigshot-voter"
 description = "Voting panels for LOKI"
 readme = "README.md"
 
